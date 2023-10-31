@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: "ubuntu-22.04"
+    env:
+      RUSTFLAGS: "-D warnings"
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Cache
+      uses: Swatinem/rust-cache@v2
+    - name: Install Tools
+      run: cargo install clippy-sarif sarif-fmt
+    - name: Build Debug
+      run: |
+        set -o pipefail
+        cargo build --workspace --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
+    - name: Build Release
+      run: |
+        set -o pipefail
+        cargo build --release --workspace --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
+    - name: Upload Results
+      uses: github/codeql-action/upload-sarif@v2
+      if: ${{ always() }}
+      with:
+        sarif_file: rust-build-results.sarif
+        wait-for-processing: true 
+  
+  
+  clippy:
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Install Tools
+        run: cargo install clippy-sarif sarif-fmt
+      - name: Checks
+        run: |
+          set -o pipefail
+          cargo clippy --message-format json --workspace --all-features -- -D warnings | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+      - name: Upload Results
+        uses: github/codeql-action/upload-sarif@v2
+        if: ${{ always() }}
+        with:
+          sarif_file: rust-clippy-results.sarif
+          wait-for-processing: true 
