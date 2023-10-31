@@ -1,0 +1,17 @@
+[package]
+name = "godot-rust-script"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+
+[dependencies]
+godot.workspace = true
+backtrace.workspace = true
+hot-lib-reloader.workspace = true
+itertools.workspace = true
+abi_stable.workspace = true
+rand.workspace = true
+cfg-if.workspace = true
+
+godot-rust-script-derive.workspace = true
