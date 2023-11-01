@@ -63,7 +63,7 @@ impl FieldExportOps {
             let parsed_params = exp_list
                 .elems
                 .iter()
-                .map(|item| ExpEasingOpts::from_expr(item))
+                .map(ExpEasingOpts::from_expr)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| err.write_errors())?;
 
@@ -92,7 +92,7 @@ impl FieldExportOps {
             let filters = list
                 .elems
                 .iter()
-                .map(|item| String::from_expr(item))
+                .map(String::from_expr)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| err.write_errors())?;
 
@@ -169,7 +169,7 @@ impl FieldExportOps {
             let types = list
                 .elems
                 .iter()
-                .map(|item| String::from_expr(item))
+                .map(String::from_expr)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| err.write_errors())?;
 

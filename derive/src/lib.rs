@@ -132,7 +132,7 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
         )
         .into_compile_error()),
         T::Tuple(tuple) => {
-            if tuple.elems.len() > 0 {
+            if !tuple.elems.is_empty() {
                 return Err(syn::Error::new(
                     ty.span(),
                     format!("\"{}\" is not a supported type", quote!(#tuple)),
@@ -159,9 +159,9 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
 fn derive_default_with_base(field_opts: &[FieldOpts]) -> TokenStream {
     let godot_types = godot_types();
     let fields: TokenStream = field_opts
-        .into_iter()
+        .iter()
         .filter_map(|field| match field.ident.as_ref() {
-            Some(ident) if ident.to_string() == "base" => {
+            Some(ident) if *ident == "base" => {
                 Some(quote_spanned!(ident.span() => #ident: base.cast(),))
             }
             Some(ident) => Some(quote_spanned!(ident.span() => #ident: Default::default(),)),

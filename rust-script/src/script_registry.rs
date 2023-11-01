@@ -53,7 +53,7 @@ where
         let args: Vec<_> = args.into_iter().map(|vref| vref.as_ref()).collect();
 
         self.call(method.as_str().into(), &args)
-            .map(|rv| RemoteValue::from(rv))
+            .map(RemoteValue::from)
             .into()
     }
 
@@ -408,7 +408,7 @@ impl<'a> RemoteValueRef<'a> {
     pub fn new(value: &'a Variant) -> Self {
         Self {
             ptr: value.var_sys(),
-            lt: PhantomData::default(),
+            lt: PhantomData,
         }
     }
 

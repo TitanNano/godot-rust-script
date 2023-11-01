@@ -30,10 +30,10 @@ impl RustScriptLanguage {
             .file_name()
             .and_then(OsStr::to_str)
             .unwrap()
-            .rsplit_once(".")
+            .rsplit_once('.')
             .unwrap()
             .0
-            .split("_")
+            .split('_')
             .map(|part| {
                 let mut chars = part.chars();
                 let first = chars.next().unwrap();
