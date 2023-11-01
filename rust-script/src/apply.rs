@@ -1,5 +1,5 @@
 pub trait Apply: Sized {
-    fn apply<F: FnOnce(&mut Self) -> ()>(mut self, cb: F) -> Self {
+    fn apply<F: FnOnce(&mut Self)>(mut self, cb: F) -> Self {
         cb(&mut self);
         self
     }

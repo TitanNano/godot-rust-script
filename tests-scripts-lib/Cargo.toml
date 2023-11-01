@@ -1,0 +1,13 @@
+[package]
+name = "tests-scripts-lib"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["dylib", "rlib"]
+
+[dependencies]
+godot-rust-script = { path = "../rust-script" }
+
+
+

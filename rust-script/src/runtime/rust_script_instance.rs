@@ -1,8 +1,9 @@
+use std::{collections::HashMap, rc::Rc};
+
+#[cfg(debug_assertions)]
 use std::{
     cell::RefCell,
-    collections::HashMap,
     ops::{Deref, DerefMut},
-    rc::Rc,
 };
 
 use abi_stable::std_types::{RBox, RString};
@@ -70,9 +71,11 @@ pub(super) struct RustScriptInstance {
     script: Gd<RustScript>,
 }
 
+#[cfg(debug_assertions)]
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub(super) struct RustScriptInstanceId(usize);
 
+#[cfg(debug_assertions)]
 impl RustScriptInstanceId {
     pub fn new() -> Self {
         Self(rand::random())
@@ -198,7 +201,7 @@ impl ScriptInstance for RustScriptInstance {
         godot_print!("calling {}::{}", self.class_name(), method);
         let method =
             RString::with_capacity(method.len()).apply(|s| s.push_str(&method.to_string()));
-        let rargs = args.into_iter().map(|v| RemoteValueRef::new(v)).collect();
+        let rargs = args.iter().map(|v| RemoteValueRef::new(v)).collect();
 
         self.with_data_mut(move |data| data.call(method, rargs))
             .map(Into::into)
@@ -221,13 +224,12 @@ impl ScriptInstance for RustScriptInstance {
             lock.read()
                 .expect("script registry is not accessible")
                 .get(class_name)
-                .map(|meta| {
+                .and_then(|meta| {
                     meta.methods()
                         .iter()
                         .find(|m| m.method_name == method)
                         .map(|_| ())
                 })
-                .flatten()
                 .is_some()
         })
     }
@@ -251,7 +253,7 @@ impl ScriptInstance for RustScriptInstance {
     fn property_state(&self) -> Vec<(StringName, Variant)> {
         self.property_list()
             .as_slice()
-            .into_iter()
+            .iter()
             .map(|prop| &prop.property_name)
             .filter_map(|name| {
                 self.get(name.to_owned())

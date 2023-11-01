@@ -60,7 +60,7 @@ impl HotReloader {
 
         Self {
             channel: receiver,
-            ffi_init_fn: ffi_init_fn,
+            ffi_init_fn,
             base,
         }
     }

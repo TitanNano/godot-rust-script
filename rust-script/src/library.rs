@@ -72,7 +72,7 @@ macro_rules! setup_library {
                 }
             }
 
-            let lock = crate::__godot_rust_plugin___SCRIPT_REGISTRY.lock().expect("unable to aquire mutex lock");
+            let lock = __godot_rust_plugin___SCRIPT_REGISTRY.lock().expect("unable to aquire mutex lock");
 
             $crate::assemble_metadata(lock.iter())
         }
@@ -112,8 +112,7 @@ impl RustScriptPropDesc {
         RemoteScriptPropertyInfo {
             variant_type: self.ty.into(),
             class_name: RStr::from_str(class_name),
-            property_name: RString::with_capacity(self.name.len())
-                .apply(|s| s.push_str(&self.name)),
+            property_name: RString::with_capacity(self.name.len()).apply(|s| s.push_str(self.name)),
             usage: if self.exported {
                 (PropertyUsageFlags::PROPERTY_USAGE_EDITOR
                     | PropertyUsageFlags::PROPERTY_USAGE_STORAGE)
@@ -167,11 +166,11 @@ pub fn assemble_metadata<'a>(
         })
         .unzip();
 
-    let methods: BTreeMap<_, _> = methods.into_iter().filter_map(|x| x).collect();
+    let methods: BTreeMap<_, _> = methods.into_iter().flatten().collect();
 
     entries
         .into_iter()
-        .filter_map(|x| x)
+        .flatten()
         .map(|class| {
             let props = (class.properties)()
                 .into_iter()
