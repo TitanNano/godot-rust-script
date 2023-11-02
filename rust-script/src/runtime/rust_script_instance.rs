@@ -1,12 +1,13 @@
 use std::{collections::HashMap, rc::Rc};
 
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 use std::{
     cell::RefCell,
     ops::{Deref, DerefMut},
 };
 
 use abi_stable::std_types::{RBox, RString};
+use cfg_if::cfg_if;
 use godot::{
     builtin::ScriptInstance,
     engine::Script,
@@ -22,12 +23,12 @@ use crate::{
     script_registry::{RemoteGodotScript_TO, RemoteValueRef},
 };
 
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 use crate::runtime::hot_reloader::HotReloadEntry;
 
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
 
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 use super::HOT_RELOAD_BRIDGE;
 
 fn script_method_list(script: &Gd<RustScript>) -> Rc<Vec<MethodInfo>> {
@@ -61,21 +62,21 @@ fn script_property_list(script: &Gd<RustScript>) -> Rc<Vec<PropertyInfo>> {
 }
 
 pub(super) struct RustScriptInstance {
-    #[cfg(not(debug_assertions))]
+    #[cfg(not(all(feature = "hot-reload", debug_assertions)))]
     data: RemoteGodotScript_TO<'static, RBox<()>>,
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
     data: RustScriptInstanceId,
 
     gd_object: Gd<Object>,
     script: Gd<RustScript>,
 }
 
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 #[derive(Hash, PartialEq, Eq, Clone, Copy)]
 pub(super) struct RustScriptInstanceId(usize);
 
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 impl RustScriptInstanceId {
     pub fn new() -> Self {
         Self(rand::random())
@@ -88,14 +89,8 @@ impl RustScriptInstance {
         gd_object: Gd<Object>,
         script: Gd<RustScript>,
     ) -> Self {
-        cfg_if::cfg_if! {
-            if #[cfg(not(debug_assertions))] {
-                Self {
-                    data,
-                    gd_object,
-                    script,
-                }
-            } else {
+        cfg_if! {
+            if #[cfg(all(feature = "hot-reload", debug_assertions))] {
                 let id = RustScriptInstanceId::new();
 
                 HOT_RELOAD_BRIDGE.with(|map| {
@@ -113,54 +108,64 @@ impl RustScriptInstance {
                     gd_object,
                     script,
                 }
+            } else {
+                Self {
+                    data,
+                    gd_object,
+                    script,
+                }
             }
         }
     }
+}
 
-    #[cfg(debug_assertions)]
-    fn with_data<T>(&self, cb: impl FnOnce(&RemoteGodotScript_TO<'static, RBox<()>>) -> T) -> T {
-        HOT_RELOAD_BRIDGE.with(|map| {
-            let map_ref = map.borrow();
+cfg_if! {
+    if #[cfg(all(feature = "hot-reload", debug_assertions))] {
+        impl RustScriptInstance {
+            fn with_data<T>(&self, cb: impl FnOnce(&RemoteGodotScript_TO<'static, RBox<()>>) -> T) -> T {
+                HOT_RELOAD_BRIDGE.with(|map| {
+                    let map_ref = map.borrow();
 
-            let inst = map_ref
-                .get(&self.data)
-                .expect("not having the remote script instance is fatal");
+                    let inst = map_ref
+                        .get(&self.data)
+                        .expect("not having the remote script instance is fatal");
 
-            let result = cb(&inst.borrow().deref().instance);
+                    let result = cb(&inst.borrow().deref().instance);
 
-            result
-        })
-    }
+                    result
+                })
+            }
 
-    #[cfg(not(debug_assertions))]
-    fn with_data<T>(&self, cb: impl FnOnce(&RemoteGodotScript_TO<'static, RBox<()>>) -> T) -> T {
-        cb(&self.data)
-    }
+            fn with_data_mut<T>(
+                &self,
+                cb: impl FnOnce(&mut RemoteGodotScript_TO<'static, RBox<()>>) -> T,
+            ) -> T {
+                HOT_RELOAD_BRIDGE.with(|map| {
+                    let map_ref = map.borrow();
 
-    #[cfg(debug_assertions)]
-    fn with_data_mut<T>(
-        &self,
-        cb: impl FnOnce(&mut RemoteGodotScript_TO<'static, RBox<()>>) -> T,
-    ) -> T {
-        HOT_RELOAD_BRIDGE.with(|map| {
-            let map_ref = map.borrow();
+                    let inst = map_ref
+                        .get(&self.data)
+                        .expect("not having the remote script instance is fatal");
 
-            let inst = map_ref
-                .get(&self.data)
-                .expect("not having the remote script instance is fatal");
+                    let result = cb(&mut inst.borrow_mut().deref_mut().instance);
 
-            let result = cb(&mut inst.borrow_mut().deref_mut().instance);
+                    result
+                })
+            }
+        }
+    } else {
+        impl RustScriptInstance {
+            fn with_data<T>(&self, cb: impl FnOnce(&RemoteGodotScript_TO<'static, RBox<()>>) -> T) -> T {
+                cb(&self.data)
+            }
 
-            result
-        })
-    }
-
-    #[cfg(not(debug_assertions))]
-    fn with_data_mut<T>(
-        &mut self,
-        cb: impl FnOnce(&mut RemoteGodotScript_TO<'static, RBox<()>>) -> T,
-    ) -> T {
-        cb(&mut self.data)
+            fn with_data_mut<T>(
+                &mut self,
+                cb: impl FnOnce(&mut RemoteGodotScript_TO<'static, RBox<()>>) -> T,
+            ) -> T {
+                cb(&mut self.data)
+            }
+        }
     }
 }
 

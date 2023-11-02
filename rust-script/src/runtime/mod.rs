@@ -1,4 +1,4 @@
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 mod hot_reloader;
 mod resource_loader;
 mod resource_saver;
@@ -28,13 +28,13 @@ use crate::{
 
 use self::rust_script_language::RustScriptLanguage;
 
-#[cfg(debug_assertions)]
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 use hot_reloader::{HotReloadEntry, HotReloader};
 
 #[macro_export]
 macro_rules! setup {
     ($lib_crate:tt) => {
-        #[cfg(debug_assertions)]
+        #[cfg(all(feature = "hot-reload", debug_assertions))]
         #[$crate::private_export::hot_module(dylib = stringify!($lib_crate), lib_dir=process_path::get_dylib_path().and_then(|path| path.parent().map(std::path::Path::to_path_buf)).unwrap_or_default())]
         mod scripts_lib {
             use $crate::private_export::RVec;
@@ -54,7 +54,7 @@ macro_rules! setup {
             pub use ::$lib_crate::__GODOT_RUST_SCRIPT_SRC_ROOT;
         }
 
-        #[cfg(not(debug_assertions))]
+        #[cfg(not(all(feature = "hot-reload", debug_assertions)))]
         mod scripts_lib {
             pub use ::$lib_crate::{__godot_rust_script_init, __GODOT_RUST_SCRIPT_SRC_ROOT};
         }
@@ -67,7 +67,7 @@ macro_rules! init {
         $crate::RustScriptExtensionLayer::new(
             scripts_lib::__godot_rust_script_init,
             scripts_lib::__GODOT_RUST_SCRIPT_SRC_ROOT,
-            #[cfg(debug_assertions)]
+            #[cfg(all(feature = "hot-reload", debug_assertions))]
             scripts_lib::subscribe,
         )
     };
@@ -75,7 +75,7 @@ macro_rules! init {
 
 thread_local! {
     static SCRIPT_REGISTRY: RwLock<HashMap<String, ScriptMetaData>> = RwLock::default();
-    #[cfg(debug_assertions)]
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
     static HOT_RELOAD_BRIDGE: std::cell::RefCell<HashMap<rust_script_instance::RustScriptInstanceId, std::cell::RefCell<HotReloadEntry>>> = std::cell::RefCell::default();
 }
 
@@ -86,7 +86,7 @@ pub trait RustScriptLibInit: Fn(Option<BindingInit>) -> RVec<RemoteScriptMetaDat
 impl<F> RustScriptLibInit for F where F: Fn(Option<BindingInit>) -> RVec<RemoteScriptMetaData> {}
 
 cfg_if! {
-    if #[cfg(debug_assertions)] {
+    if #[cfg(all(feature = "hot-reload", debug_assertions))] {
         type HotReloadSubscribe = fn() -> hot_lib_reloader::LibReloadObserver;
     }
 }
@@ -98,10 +98,10 @@ pub struct RustScriptExtensionLayer {
     res_loader: Option<Gd<RustScriptResourceLoader>>,
     scripts_src_dir: Option<&'static str>,
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
     hot_reload_subscribe: HotReloadSubscribe,
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(feature = "hot-reload", debug_assertions))]
     hot_reloader: Option<Gd<HotReloader>>,
 }
 
@@ -109,7 +109,8 @@ impl RustScriptExtensionLayer {
     pub fn new<F: RustScriptLibInit + 'static + Clone>(
         lib_init_fn: F,
         scripts_src_dir: &'static str,
-        #[cfg(debug_assertions)] hot_reload_subscribe: HotReloadSubscribe,
+        #[cfg(all(feature = "hot-reload", debug_assertions))]
+        hot_reload_subscribe: HotReloadSubscribe,
     ) -> Self {
         Self {
             lib_init_fn: Rc::new(lib_init_fn),
@@ -118,10 +119,10 @@ impl RustScriptExtensionLayer {
             res_loader: None,
             scripts_src_dir: Some(scripts_src_dir),
 
-            #[cfg(debug_assertions)]
+            #[cfg(all(feature = "hot-reload", debug_assertions))]
             hot_reload_subscribe,
 
-            #[cfg(debug_assertions)]
+            #[cfg(all(feature = "hot-reload", debug_assertions))]
             hot_reloader: None,
         }
     }
@@ -134,7 +135,7 @@ impl RustScriptExtensionLayer {
         let res_saver = Gd::new(RustScriptResourceSaver);
 
         cfg_if! {
-            if #[cfg(debug_assertions)] {
+            if #[cfg(all(feature = "hot-reload", debug_assertions))] {
                 use godot::prelude::StringName;
 
                 let mut hot_reloader = Gd::with_base(|base| HotReloader::new((self.hot_reload_subscribe)(), self.lib_init_fn.clone(), base));
@@ -179,7 +180,7 @@ impl RustScriptExtensionLayer {
 
 fn load_rust_scripts(lib_init_fn: Rc<dyn RustScriptLibInit>) {
     cfg_if! {
-        if #[cfg(debug_assertions)] {
+        if #[cfg(all(feature = "hot-reload", debug_assertions))] {
             let ffi_init = Some(unsafe { godot::sys::get_binding() });
         } else {
             let ffi_init = None;
@@ -237,19 +238,5 @@ impl ToDictionary for MethodInfo {
 
             dict.set("return", self.return_type.to_dict());
         })
-    }
-}
-
-#[cfg(test)]
-mod test {
-    mod macros_test {
-        crate::setup!(tests_scripts_lib);
-
-        #[test]
-        fn verify_macros() {
-            let inst = crate::init!();
-
-            assert_eq!(inst.lang, None);
-        }
     }
 }

@@ -20,6 +20,8 @@ jobs:
       uses: actions/checkout@v3
     - name: Setup Cache
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
     - name: Install Tools
       run: cargo install clippy-sarif sarif-fmt
     - name: Build Debug
@@ -36,8 +38,7 @@ jobs:
       with:
         sarif_file: rust-build-results.sarif
         wait-for-processing: true 
-  
-  
+
   clippy:
     runs-on: "ubuntu-22.04"
 
@@ -59,4 +60,18 @@ jobs:
         if: ${{ always() }}
         with:
           sarif_file: rust-clippy-results.sarif
-          wait-for-processing: true 
+          wait-for-processing: true
+
+  tests:
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Setup Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Tests
+        run: |
+          cargo test
