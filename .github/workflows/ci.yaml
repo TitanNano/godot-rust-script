@@ -9,6 +9,9 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  security-events: "write"
+
 jobs:
   build:
     runs-on: "ubuntu-22.04"
