@@ -1,6 +1,6 @@
 use abi_stable::std_types::RVec;
 
-use crate::RemoteScriptMetaData;
+use crate::script_registry::RemoteScriptMetaData;
 
 pub type BindingInit = godot::sys::GodotBinding;
 

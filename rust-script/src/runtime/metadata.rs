@@ -11,8 +11,7 @@ use godot::{
 
 use crate::{
     apply::Apply,
-    script_registry::{CreateScriptInstanceData_TO, RemoteGodotScript_TO},
-    RemoteScriptMetaData,
+    script_registry::{CreateScriptInstanceData_TO, RemoteGodotScript_TO, RemoteScriptMetaData},
 };
 
 #[derive(Debug)]

@@ -18,7 +18,7 @@ process_path = { workspace = true, optional = true }
 godot-rust-script-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
-tests-scripts-lib = { path = "../tests-scripts-lib", features = ["hot-reload"] }
+tests-scripts-lib = { path = "../tests-scripts-lib", features = ["test-hot-reload"] }
 godot-rust-script = { path = "./", features = ["runtime"] }
 
 [features]
