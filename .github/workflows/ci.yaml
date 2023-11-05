@@ -31,6 +31,14 @@ jobs:
       run: |
         set -o pipefail
         cargo build --workspace --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
+    - name: Build Debug Runtime
+      run: |
+        set -o pipefail
+        cargo build -p godot-rust-script --features "runtime" --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
+    - name: Build Debug Scripts
+      run: |
+        set -o pipefail
+        cargo build -p godot-rust-script --features "scripts" --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
     - name: Build Release
       run: |
         set -o pipefail

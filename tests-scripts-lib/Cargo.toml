@@ -10,7 +10,7 @@ crate-type = ["dylib", "rlib"]
 godot-rust-script = { path = "../rust-script", features = ["hot-reload", "scripts"] }
 
 [features]
-hot-reload = ["godot-rust-script/hot-reload"]
+test-hot-reload = ["godot-rust-script/hot-reload"]
 
 
 
