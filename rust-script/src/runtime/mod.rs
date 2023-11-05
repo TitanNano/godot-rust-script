@@ -28,10 +28,10 @@ use self::rust_script_language::RustScriptLanguage;
 #[cfg(all(feature = "hot-reload", debug_assertions))]
 use hot_reloader::{HotReloadEntry, HotReloader};
 
+#[cfg(all(feature = "hot-reload", debug_assertions))]
 #[macro_export]
 macro_rules! setup {
     ($lib_crate:tt) => {
-        #[cfg(all(feature = "hot-reload", debug_assertions))]
         #[$crate::private_export::hot_module(dylib = stringify!($lib_crate), lib_dir=process_path::get_dylib_path().and_then(|path| path.parent().map(std::path::Path::to_path_buf)).unwrap_or_default())]
         mod scripts_lib {
             use $crate::private_export::RVec;
@@ -50,21 +50,37 @@ macro_rules! setup {
 
             pub use ::$lib_crate::__GODOT_RUST_SCRIPT_SRC_ROOT;
         }
-
-        #[cfg(not(all(feature = "hot-reload", debug_assertions)))]
+    };
+}
+    
+#[cfg(not(all(feature = "hot-reload", debug_assertions)))]
+#[macro_export]
+macro_rules! setup {
+    ($lib_crate:tt) => {
         mod scripts_lib {
             pub use ::$lib_crate::{__godot_rust_script_init, __GODOT_RUST_SCRIPT_SRC_ROOT};
         }
     };
 }
 
+#[cfg(not(all(feature = "hot-reload", debug_assertions)))]
 #[macro_export]
 macro_rules! init {
     () => {
         $crate::RustScriptExtensionLayer::new(
             scripts_lib::__godot_rust_script_init,
             scripts_lib::__GODOT_RUST_SCRIPT_SRC_ROOT,
-            #[cfg(all(feature = "hot-reload", debug_assertions))]
+        )
+    };
+}
+
+#[cfg(all(feature = "hot-reload", debug_assertions))]
+#[macro_export]
+macro_rules! init {
+    () => {
+        $crate::RustScriptExtensionLayer::new(
+            scripts_lib::__godot_rust_script_init,
+            scripts_lib::__GODOT_RUST_SCRIPT_SRC_ROOT,
             scripts_lib::subscribe,
         )
     };
