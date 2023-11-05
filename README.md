@@ -32,7 +32,7 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-godot-rust-script = { git  = "https://github.com/TitanNano/godot-rust-script.git", branch = "master" }
+godot-rust-script = { git  = "https://github.com/TitanNano/godot-rust-script.git", branch = "master", features = ["runtime"] }
 scripts = { path = "./scripts" }
 ```
 
@@ -88,7 +88,7 @@ edition = "2021"
 crate-type = ["dylib", "rlib"]
 
 [dependencies]
-godot-rust-script = { git  = "https://github.com/TitanNano/godot-rust-script.git", branch = "master" }
+godot-rust-script = { git  = "https://github.com/TitanNano/godot-rust-script.git", branch = "master", features = ["scripts"] }
 ```
 
 scripts-lib/src/lib.rs

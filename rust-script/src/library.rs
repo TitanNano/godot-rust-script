@@ -57,7 +57,7 @@ macro_rules! setup_library {
         $crate::private_export::plugin_registry!(pub __SCRIPT_REGISTRY: $crate::RegistryItem);
 
         #[no_mangle]
-        pub fn __godot_rust_script_init(binding: Option<$crate::BindingInit>) -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
+        pub fn __godot_rust_script_init(binding: Option<$crate::private_export::BindingInit>) -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
             use $crate::private_export::*;
             use $crate::godot::obj::EngineEnum;
 

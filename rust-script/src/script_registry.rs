@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, marker::PhantomData, rc::Rc};
+use std::{collections::HashMap, fmt::Debug, marker::PhantomData};
 
 use abi_stable::{
     sabi_trait::TD_CanDowncast,
@@ -11,7 +11,7 @@ use godot::{
     prelude::{
         godot_print,
         meta::{ClassName, MethodInfo, PropertyInfo},
-        Gd, Object, StringName, ToGodot, Variant,
+        Gd, Object, StringName, Variant,
     },
     sys::VariantType,
 };
@@ -147,11 +147,11 @@ impl From<RemoteScriptMethodInfo> for MethodInfo {
 #[derive(Debug, StableAbi)]
 #[repr(C)]
 pub struct RemoteScriptMetaData {
-    class_name: RStr<'static>,
-    base_type_name: RStr<'static>,
-    properties: RVec<RemoteScriptPropertyInfo>,
-    methods: RVec<RemoteScriptMethodInfo>,
-    create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
+    pub(crate) class_name: RStr<'static>,
+    pub(crate) base_type_name: RStr<'static>,
+    pub(crate) properties: RVec<RemoteScriptPropertyInfo>,
+    pub(crate) methods: RVec<RemoteScriptMethodInfo>,
+    pub(crate) create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
 }
 
 impl RemoteScriptMetaData {
@@ -171,49 +171,6 @@ impl RemoteScriptMetaData {
             properties,
             methods,
             create_data: CreateScriptInstanceData_TO::from_value(create_data, TD_CanDowncast),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct ScriptMetaData {
-    class_name: ClassName,
-    base_type_name: StringName,
-    properties: Rc<Vec<PropertyInfo>>,
-    methods: Rc<Vec<MethodInfo>>,
-    create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
-}
-
-impl ScriptMetaData {
-    pub fn class_name(&self) -> ClassName {
-        self.class_name
-    }
-
-    pub fn base_type_name(&self) -> StringName {
-        self.base_type_name.clone()
-    }
-
-    pub fn create_data(&self, base: Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> {
-        self.create_data.create(base.to_variant().into())
-    }
-
-    pub fn properties(&self) -> Rc<Vec<PropertyInfo>> {
-        self.properties.clone()
-    }
-
-    pub fn methods(&self) -> Rc<Vec<MethodInfo>> {
-        self.methods.clone()
-    }
-}
-
-impl From<RemoteScriptMetaData> for ScriptMetaData {
-    fn from(value: RemoteScriptMetaData) -> Self {
-        Self {
-            class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
-            base_type_name: StringName::from(value.base_type_name.as_str()),
-            properties: Rc::new(value.properties.into_iter().map(Into::into).collect()),
-            methods: Rc::new(value.methods.into_iter().map(Into::into).collect()),
-            create_data: value.create_data,
         }
     }
 }
