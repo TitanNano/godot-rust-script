@@ -321,6 +321,7 @@ dependencies = [
  "abi_stable",
  "cfg-if 1.0.0",
  "godot",
+ "godot-rust-script",
  "godot-rust-script-derive",
  "hot-lib-reloader",
  "itertools",

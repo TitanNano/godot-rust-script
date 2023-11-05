@@ -13,9 +13,10 @@ use RemoteGodotScript_trait::RemoteGodotScript_TO;
 use crate::script_registry::RemoteGodotScript_trait;
 
 use super::{
+    metadata::ToDictionary,
     rust_script_instance::{RustScriptInstance, RustScriptPlaceholder},
     rust_script_language::RustScriptLanguage,
-    ToDictionary, SCRIPT_REGISTRY,
+    SCRIPT_REGISTRY,
 };
 
 #[derive(GodotClass)]

@@ -7,19 +7,22 @@ edition.workspace = true
 
 [dependencies]
 godot.workspace = true
-itertools.workspace = true
 abi_stable.workspace = true
-rand.workspace = true
 cfg-if.workspace = true
 
 hot-lib-reloader = { workspace = true, optional = true }
+itertools = { workspace = true, optional = true }
+rand = { workspace = true, optional = true }
 process_path = { workspace = true, optional = true }
 
-godot-rust-script-derive.workspace = true
+godot-rust-script-derive = { workspace = true, optional = true }
 
 [dev-dependencies]
 tests-scripts-lib = { path = "../tests-scripts-lib", features = ["hot-reload"] }
+godot-rust-script = { path = "./", features = ["runtime"] }
 
 [features]
 default = ["hot-reload"]
 hot-reload = ["dep:process_path", "dep:hot-lib-reloader"]
+runtime = ["dep:itertools", "dep:rand"]
+scripts = ["dep:godot-rust-script-derive"]

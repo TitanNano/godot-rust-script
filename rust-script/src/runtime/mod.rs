@@ -1,5 +1,6 @@
 #[cfg(all(feature = "hot-reload", debug_assertions))]
 mod hot_reloader;
+mod metadata;
 mod resource_loader;
 mod resource_saver;
 mod rust_script;
@@ -8,22 +9,18 @@ mod rust_script_language;
 
 use std::{collections::HashMap, rc::Rc, sync::RwLock};
 
-use abi_stable::std_types::RVec;
 use cfg_if::cfg_if;
 use godot::{
     engine::{Engine, ResourceLoader, ResourceSaver},
-    obj::EngineEnum,
-    prelude::{
-        godot_print,
-        meta::{MethodInfo, PropertyInfo},
-        Array, Dictionary, Gd,
-    },
+    prelude::{godot_print, Gd},
 };
 
 use crate::{
-    apply::Apply,
-    runtime::{resource_loader::RustScriptResourceLoader, resource_saver::RustScriptResourceSaver},
-    script_registry::{RemoteScriptMetaData, ScriptMetaData},
+    runtime::{
+        metadata::ScriptMetaData, resource_loader::RustScriptResourceLoader,
+        resource_saver::RustScriptResourceSaver,
+    },
+    shared::RustScriptLibInit,
 };
 
 use self::rust_script_language::RustScriptLanguage;
@@ -43,7 +40,7 @@ macro_rules! setup {
             #[hot_functions]
             extern "Rust" {
                 pub fn __godot_rust_script_init(
-                    binding: Option<$crate::BindingInit>,
+                    binding: Option<$crate::private_export::BindingInit>,
                 ) -> RVec<$crate::RemoteScriptMetaData>;
             }
 
@@ -78,12 +75,6 @@ thread_local! {
     #[cfg(all(feature = "hot-reload", debug_assertions))]
     static HOT_RELOAD_BRIDGE: std::cell::RefCell<HashMap<rust_script_instance::RustScriptInstanceId, std::cell::RefCell<HotReloadEntry>>> = std::cell::RefCell::default();
 }
-
-pub type BindingInit = godot::sys::GodotBinding;
-
-pub trait RustScriptLibInit: Fn(Option<BindingInit>) -> RVec<RemoteScriptMetaData> {}
-
-impl<F> RustScriptLibInit for F where F: Fn(Option<BindingInit>) -> RVec<RemoteScriptMetaData> {}
 
 cfg_if! {
     if #[cfg(all(feature = "hot-reload", debug_assertions))] {
@@ -205,38 +196,4 @@ fn load_rust_scripts(lib_init_fn: Rc<dyn RustScriptLibInit>) {
 
         *reg = registry;
     });
-}
-
-trait ToDictionary {
-    fn to_dict(&self) -> Dictionary;
-}
-
-impl ToDictionary for PropertyInfo {
-    fn to_dict(&self) -> Dictionary {
-        let mut dict = Dictionary::new();
-
-        dict.set("name", self.property_name.clone());
-        dict.set("class_name", self.class_name.to_string_name());
-        dict.set("type", self.variant_type as i32);
-        dict.set("hint", self.hint.ord());
-        dict.set("hint_string", self.hint_string.clone());
-        dict.set("usage", self.usage.ord());
-
-        dict
-    }
-}
-
-impl ToDictionary for MethodInfo {
-    fn to_dict(&self) -> Dictionary {
-        Dictionary::new().apply(|dict| {
-            dict.set("name", self.method_name.clone());
-            dict.set("flags", self.flags.ord());
-
-            let args: Array<_> = self.arguments.iter().map(|arg| arg.to_dict()).collect();
-
-            dict.set("args", args);
-
-            dict.set("return", self.return_type.to_dict());
-        })
-    }
 }

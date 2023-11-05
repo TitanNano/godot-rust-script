@@ -13,7 +13,7 @@ use hot_lib_reloader::LibReloadObserver;
 use crate::{
     apply::Apply,
     script_registry::{RemoteGodotScript_TO, RemoteValueRef},
-    RustScriptLibInit,
+    shared::RustScriptLibInit,
 };
 
 use super::{rust_script::RustScript, HOT_RELOAD_BRIDGE};
