@@ -7,6 +7,7 @@ use godot::{
         meta::{ClassName, MethodInfo, PropertyInfo},
         Array, Dictionary, Gd, Object, StringName, ToGodot,
     },
+    sys::VariantType,
 };
 
 use crate::{
@@ -87,6 +88,104 @@ impl ToDictionary for MethodInfo {
             dict.set("args", args);
 
             dict.set("return", self.return_type.to_dict());
+        })
+    }
+}
+
+fn variant_type_to_str(var_type: VariantType) -> &'static str {
+    use VariantType as V;
+
+    match var_type {
+        V::Nil => "void",
+        V::Bool => "Bool",
+        V::Int => "Int",
+        V::Float => "Float",
+        V::String => "String",
+        V::Vector2 => "Vector2",
+        V::Vector2i => "Vector2i",
+        V::Rect2 => "Rect2",
+        V::Rect2i => "Rect2i",
+        V::Vector3 => "Vector3",
+        V::Vector3i => "Vector3i",
+        V::Transform2D => "Transform2D",
+        V::Vector4 => "Vector4",
+        V::Vector4i => "Vector4i",
+        V::Plane => "Plane",
+        V::Quaternion => "Quaternion",
+        V::Aabb => "Aabb",
+        V::Basis => "Basis",
+        V::Transform3D => "Transform3D",
+        V::Projection => "Projection",
+        V::Color => "Color",
+        V::StringName => "StringName",
+        V::NodePath => "NodePath",
+        V::Rid => "Rid",
+        V::Object => "Object",
+        V::Callable => "Callable",
+        V::Signal => "Signal",
+        V::Dictionary => "Dictionary",
+        V::Array => "Array",
+        V::PackedByteArray => "PackedByteArray",
+        V::PackedInt32Array => "PackedInt32Array",
+        V::PackedInt64Array => "PackedInt64Array",
+        V::PackedColorArray => "PackedColorArray",
+        V::PackedStringArray => "PackedStringArray",
+        V::PackedVector3Array => "PackedVector3Array",
+        V::PackedVector2Array => "PackedVector2Array",
+        V::PackedFloat64Array => "PackedFloat64Array",
+        V::PackedFloat32Array => "PackedFloat32Array",
+    }
+}
+
+pub trait ToMethodDoc {
+    fn to_method_doc(&self) -> Dictionary;
+}
+
+impl ToMethodDoc for MethodInfo {
+    fn to_method_doc(&self) -> Dictionary {
+        let args: Array<Dictionary> = self
+            .arguments
+            .iter()
+            .map(|arg| arg.to_argument_doc())
+            .collect();
+
+        Dictionary::new().apply(|dict| {
+            dict.set("name", self.method_name.clone());
+            dict.set(
+                "return_type",
+                variant_type_to_str(self.return_type.variant_type),
+            );
+            dict.set("is_deprecated", false);
+            dict.set("is_experimental", false);
+            dict.set("arguments", args);
+        })
+    }
+}
+
+pub trait ToArgumentDoc {
+    fn to_argument_doc(&self) -> Dictionary;
+}
+
+impl ToArgumentDoc for PropertyInfo {
+    fn to_argument_doc(&self) -> Dictionary {
+        Dictionary::new().apply(|dict| {
+            dict.set("name", self.property_name.clone());
+            dict.set("type", variant_type_to_str(self.variant_type));
+        })
+    }
+}
+
+pub trait ToPropertyDoc {
+    fn to_property_doc(&self) -> Dictionary;
+}
+
+impl ToPropertyDoc for PropertyInfo {
+    fn to_property_doc(&self) -> Dictionary {
+        Dictionary::new().apply(|dict| {
+            dict.set("name", self.property_name.clone());
+            dict.set("type", variant_type_to_str(self.variant_type));
+            dict.set("is_deprecated", false);
+            dict.set("is_experimental", false);
         })
     }
 }
