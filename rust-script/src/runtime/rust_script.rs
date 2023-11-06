@@ -6,14 +6,15 @@ use godot::{
     engine::{Engine, Script, ScriptExtension, ScriptExtensionVirtual, ScriptLanguage},
     prelude::{
         godot_api, Array, Base, Dictionary, Gd, GodotClass, GodotString, Object, StringName,
+        VariantArray,
     },
 };
 use RemoteGodotScript_trait::RemoteGodotScript_TO;
 
-use crate::script_registry::RemoteGodotScript_trait;
+use crate::{apply::Apply, script_registry::RemoteGodotScript_trait};
 
 use super::{
-    metadata::ToDictionary,
+    metadata::{ToDictionary, ToMethodDoc, ToPropertyDoc},
     rust_script_instance::{RustScriptInstance, RustScriptPlaceholder},
     rust_script_language::RustScriptLanguage,
     SCRIPT_REGISTRY,
@@ -193,5 +194,52 @@ impl ScriptExtensionVirtual for RustScript {
                 })
                 .unwrap_or_default()
         })
+    }
+
+    fn get_documentation(&self) -> Array<Dictionary> {
+        let (methods, props): (Array<Dictionary>, Array<Dictionary>) = SCRIPT_REGISTRY
+            .with(|lock| {
+                let reg = lock.read().expect("unable to obtain read lock");
+
+                reg.get(&self.class_name).map(|class| {
+                    let methods = class
+                        .methods()
+                        .iter()
+                        .map(|method| method.to_method_doc())
+                        .collect();
+
+                    let props = class
+                        .properties()
+                        .iter()
+                        .map(|prop| prop.to_property_doc())
+                        .collect();
+
+                    (methods, props)
+                })
+            })
+            .unwrap_or_default();
+
+        let class_doc = Dictionary::new().apply(|dict| {
+            dict.set(GodotString::from("name"), self.class_name());
+            dict.set(GodotString::from("inherits"), self.get_instance_base_type());
+            dict.set(GodotString::from("brief_description"), GodotString::new());
+            dict.set(GodotString::from("description"), GodotString::new());
+            dict.set(GodotString::from("tutorials"), VariantArray::new());
+            dict.set(GodotString::from("constructors"), VariantArray::new());
+            dict.set(GodotString::from("methods"), methods);
+            dict.set(GodotString::from("operators"), VariantArray::new());
+            dict.set(GodotString::from("signals"), VariantArray::new());
+            dict.set(GodotString::from("constants"), VariantArray::new());
+            dict.set(GodotString::from("enums"), VariantArray::new());
+            dict.set(GodotString::from("properties"), props);
+            dict.set(GodotString::from("theme_properties"), VariantArray::new());
+            dict.set(GodotString::from("annotations"), VariantArray::new());
+            dict.set(GodotString::from("is_deprecated"), false);
+            dict.set(GodotString::from("is_experimental"), false);
+            dict.set(GodotString::from("is_script_doc"), true);
+            dict.set(GodotString::from("script_path"), self.base.get_path());
+        });
+
+        Array::from(&[class_doc])
     }
 }
