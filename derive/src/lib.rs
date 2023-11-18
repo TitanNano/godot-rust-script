@@ -9,9 +9,9 @@ use quote::{quote, quote_spanned};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
 use type_paths::{godot_types, string_name_ty, variant_ty};
 
-use crate::attribute_ops::FieldExportOps;
+use crate::attribute_ops::{FieldExportOps, PropertyOpts};
 
-#[proc_macro_derive(GodotScript, attributes(export, script))]
+#[proc_macro_derive(GodotScript, attributes(export, script, prop))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -30,9 +30,10 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let script_type_ident = opts.ident;
     let fields = opts.data.take_struct().unwrap().fields;
 
-    let public_fields = fields
-        .iter()
-        .filter(|field| matches!(field.vis, syn::Visibility::Public(_)));
+    let public_fields = fields.iter().filter(|field| {
+        matches!(field.vis, syn::Visibility::Public(_))
+            || field.attrs.iter().any(|attr| attr.path().is_ident("prop"))
+    });
 
     let field_metadata_result: Result<TokenStream, TokenStream> = public_fields
         .clone()
@@ -184,12 +185,23 @@ fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
     let variant_ty = variant_ty();
 
     let get_field_dispatch: TokenStream = public_fields
-        .filter_map(|field| field.ident.as_ref())
+        .filter(|field| field.ident.is_some())
         .map(|field| {
-            let field_name = field.to_string();
+            let field_ident = field.ident.as_ref().unwrap();
+            let field_name = field_ident.to_string();
+
+            let opts = match PropertyOpts::from_attributes(&field.attrs) {
+                Ok(opts) => opts,
+                Err(err) => return err.write_errors(),
+            };
+
+            let accessor = match opts.get {
+                Some(getter) => quote_spanned!(getter.span() => #getter(&self)),
+                None => quote!(self.#field_ident),
+            };
 
             quote! {
-                #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&self.#field)),
+                #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&#accessor)),
             }
         })
         .collect();
@@ -211,13 +223,26 @@ fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
     let godot_types = godot_types();
 
     let set_field_dispatch: TokenStream = public_fields
-        .filter_map(|field| field.ident.as_ref())
+        .filter(|field| field.ident.is_some())
         .map(|field| {
-            let field_name = field.to_string();
+            let field_ident = field.ident.as_ref().unwrap();
+            let field_name = field_ident.to_string();
+
+            let opts = match PropertyOpts::from_attributes(&field.attrs) {
+                Ok(opts) => opts,
+                Err(err) => return err.write_errors(),
+            };
+
+            let variant_value = quote!(#godot_types::prelude::FromGodot::from_variant(&value));
+
+            let assignment = match opts.set {
+                Some(setter) => quote_spanned!(setter.span() => #setter(self, #variant_value)),
+                None => quote!(self.#field_ident = #variant_value),
+            };
 
             quote_spanned! {
-                field.span() =>
-                #field_name => self.#field = #godot_types::prelude::FromGodot::from_variant(&value),
+                field_ident.span() =>
+                #field_name => #assignment,
             }
         })
         .collect();
