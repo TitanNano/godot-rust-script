@@ -59,6 +59,7 @@ pub fn godot_script_impl(
                                 exported: false,
                                 hint: #property_hints::PROPERTY_HINT_NONE,
                                 hint_string: "",
+                                description: "",
                             },
                         },
 
@@ -105,6 +106,7 @@ pub fn godot_script_impl(
                         exported: false,
                         hint: #property_hints::PROPERTY_HINT_NONE,
                         hint_string: "",
+                        description: "",
                     },
                     flags: #method_flag,
                 },

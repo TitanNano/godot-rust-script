@@ -92,7 +92,7 @@ pub trait GodotScriptImpl {
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
 }
 
-#[derive(Debug, StableAbi)]
+#[derive(Debug, StableAbi, Clone)]
 #[repr(C)]
 pub struct RemoteScriptPropertyInfo {
     pub variant_type: RemoteVariantType,
@@ -101,6 +101,7 @@ pub struct RemoteScriptPropertyInfo {
     pub hint: i32,
     pub hint_string: RStr<'static>,
     pub usage: i32,
+    pub description: RStr<'static>,
 }
 
 impl From<RemoteScriptPropertyInfo> for PropertyInfo {
@@ -118,7 +119,7 @@ impl From<RemoteScriptPropertyInfo> for PropertyInfo {
     }
 }
 
-#[derive(Debug, StableAbi)]
+#[derive(Debug, StableAbi, Clone)]
 #[repr(C)]
 pub struct RemoteScriptMethodInfo {
     pub id: i32,
@@ -152,6 +153,7 @@ pub struct RemoteScriptMetaData {
     pub(crate) properties: RVec<RemoteScriptPropertyInfo>,
     pub(crate) methods: RVec<RemoteScriptMethodInfo>,
     pub(crate) create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
+    pub(crate) description: RStr<'static>,
 }
 
 impl RemoteScriptMetaData {
@@ -161,6 +163,7 @@ impl RemoteScriptMetaData {
         properties: RVec<RemoteScriptPropertyInfo>,
         methods: RVec<RemoteScriptMethodInfo>,
         create_data: CD,
+        description: RStr<'static>,
     ) -> Self
     where
         CD: CreateScriptInstanceData + 'static,
@@ -171,6 +174,7 @@ impl RemoteScriptMetaData {
             properties,
             methods,
             create_data: CreateScriptInstanceData_TO::from_value(create_data, TD_CanDowncast),
+            description,
         }
     }
 }
@@ -191,7 +195,7 @@ where
     }
 }
 
-#[derive(Debug, StableAbi)]
+#[derive(Debug, StableAbi, Clone, Copy)]
 #[repr(usize)]
 pub enum RemoteVariantType {
     Nil,

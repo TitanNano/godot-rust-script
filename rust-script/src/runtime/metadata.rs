@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{ops::Deref, rc::Rc};
 
 use abi_stable::std_types::RBox;
 use godot::{
@@ -19,9 +19,11 @@ use crate::{
 pub struct ScriptMetaData {
     class_name: ClassName,
     base_type_name: StringName,
+    properties_documented: Vec<Documented<PropertyInfo>>,
     properties: Rc<Vec<PropertyInfo>>,
     methods: Rc<Vec<MethodInfo>>,
     create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
+    description: &'static str,
 }
 
 impl ScriptMetaData {
@@ -41,19 +43,36 @@ impl ScriptMetaData {
         self.properties.clone()
     }
 
+    pub fn properties_documented(&self) -> &[Documented<PropertyInfo>] {
+        &self.properties_documented
+    }
+
     pub fn methods(&self) -> Rc<Vec<MethodInfo>> {
         self.methods.clone()
+    }
+
+    pub fn description(&self) -> &'static str {
+        self.description
     }
 }
 
 impl From<RemoteScriptMetaData> for ScriptMetaData {
     fn from(value: RemoteScriptMetaData) -> Self {
+        let properties: Vec<Documented<PropertyInfo>> = value
+            .properties
+            .clone()
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
         Self {
             class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
-            base_type_name: StringName::from(value.base_type_name.as_str()),
+            base_type_name: StringName::from(&value.base_type_name.as_str()),
+            properties_documented: properties,
             properties: Rc::new(value.properties.into_iter().map(Into::into).collect()),
             methods: Rc::new(value.methods.into_iter().map(Into::into).collect()),
             create_data: value.create_data,
+            description: value.description.as_str(),
         }
     }
 }
@@ -162,6 +181,38 @@ impl ToMethodDoc for MethodInfo {
     }
 }
 
+#[derive(Debug)]
+pub struct Documented<T> {
+    inner: T,
+    description: &'static str,
+}
+
+impl From<crate::script_registry::RemoteScriptPropertyInfo> for Documented<PropertyInfo> {
+    fn from(value: crate::script_registry::RemoteScriptPropertyInfo) -> Self {
+        Self {
+            description: value.description.as_str(),
+            inner: value.into(),
+        }
+    }
+}
+
+impl<T> Deref for Documented<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<T: Clone> Clone for Documented<T> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            description: self.description,
+        }
+    }
+}
+
 pub trait ToArgumentDoc {
     fn to_argument_doc(&self) -> Dictionary;
 }
@@ -171,6 +222,14 @@ impl ToArgumentDoc for PropertyInfo {
         Dictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
             dict.set("type", variant_type_to_str(self.variant_type));
+        })
+    }
+}
+
+impl<T: ToArgumentDoc> ToArgumentDoc for Documented<T> {
+    fn to_argument_doc(&self) -> Dictionary {
+        self.inner.to_argument_doc().apply(|dict| {
+            dict.set("description", self.description);
         })
     }
 }
@@ -187,5 +246,13 @@ impl ToPropertyDoc for PropertyInfo {
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
         })
+    }
+}
+
+impl<T: ToPropertyDoc> ToPropertyDoc for Documented<T> {
+    fn to_property_doc(&self) -> Dictionary {
+        self.inner
+            .to_property_doc()
+            .apply(|dict| dict.set("description", self.description))
     }
 }
