@@ -139,13 +139,13 @@ impl RustScriptExtensionLayer {
 
         let lang: Gd<RustScriptLanguage> = RustScriptLanguage::new(self.scripts_src_dir);
         let res_loader = RustScriptResourceLoader::new(lang.clone());
-        let res_saver = Gd::new(RustScriptResourceSaver);
+        let res_saver = Gd::from_object(RustScriptResourceSaver);
 
         cfg_if! {
             if #[cfg(all(feature = "hot-reload", debug_assertions))] {
                 use godot::prelude::StringName;
 
-                let mut hot_reloader = Gd::with_base(|base| HotReloader::new((self.hot_reload_subscribe)(), self.lib_init_fn.clone(), base));
+                let mut hot_reloader = Gd::from_init_fn(|base| HotReloader::new((self.hot_reload_subscribe)(), self.lib_init_fn.clone(), base));
 
                 hot_reloader.call_deferred(StringName::from("register"), &[]);
 
