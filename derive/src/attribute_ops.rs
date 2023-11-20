@@ -246,7 +246,7 @@ enum ExpEasingOpts {
 }
 
 #[derive(FromField, Debug)]
-#[darling(forward_attrs(export, prop))]
+#[darling(forward_attrs(export, prop, doc))]
 pub struct FieldOpts {
     pub ident: Option<syn::Ident>,
     pub attrs: Vec<syn::Attribute>,
@@ -254,12 +254,13 @@ pub struct FieldOpts {
     pub ty: syn::Type,
 }
 
-#[derive(FromDeriveInput)]
-#[darling(supports(struct_any), attributes(script))]
+#[derive(FromDeriveInput, Debug)]
+#[darling(supports(struct_any), attributes(script), forward_attrs(doc))]
 pub struct GodotScriptOpts {
     pub ident: syn::Ident,
     pub data: Data<util::Ignored, FieldOpts>,
     pub base: Option<syn::Ident>,
+    pub attrs: Vec<syn::Attribute>,
 }
 
 #[derive(FromAttributes, Debug)]

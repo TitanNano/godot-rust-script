@@ -52,7 +52,7 @@ macro_rules! setup {
         }
     };
 }
-    
+
 #[cfg(not(all(feature = "hot-reload", debug_assertions)))]
 #[macro_export]
 macro_rules! setup {

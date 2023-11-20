@@ -1,5 +1,5 @@
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, FnArg, ImplItem, ItemImpl, ReturnType, Type};
 
 use crate::{
@@ -59,6 +59,7 @@ pub fn godot_script_impl(
                                 exported: false,
                                 hint: #property_hints::PROPERTY_HINT_NONE,
                                 hint_string: "",
+                                description: "",
                             },
                         },
 
@@ -94,6 +95,15 @@ pub fn godot_script_impl(
                 quote!(#godot_types::engine::global::MethodFlags::METHOD_FLAG_NORMAL)
             };
 
+            let description = fnc.attrs.iter()
+                .filter(|attr| attr.path().is_ident("doc"))
+                .map(|attr| attr.meta.require_name_value().unwrap().value.to_token_stream())
+                .reduce(|mut acc, ident| {
+                    acc.extend(quote!(, "\n", ));
+                    acc.extend(ident);
+                    acc
+                });
+
             let metadata = quote_spanned! {
                 fnc.span() =>
                 ::godot_rust_script::RustScriptMethodDesc {
@@ -105,8 +115,10 @@ pub fn godot_script_impl(
                         exported: false,
                         hint: #property_hints::PROPERTY_HINT_NONE,
                         hint_string: "",
+                        description: "",
                     },
                     flags: #method_flag,
+                    description: concat!(#description),
                 },
             };
 

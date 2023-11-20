@@ -197,33 +197,36 @@ impl ScriptExtensionVirtual for RustScript {
     }
 
     fn get_documentation(&self) -> Array<Dictionary> {
-        let (methods, props): (Array<Dictionary>, Array<Dictionary>) = SCRIPT_REGISTRY
-            .with(|lock| {
-                let reg = lock.read().expect("unable to obtain read lock");
+        let (methods, props, description): (Array<Dictionary>, Array<Dictionary>, &'static str) =
+            SCRIPT_REGISTRY
+                .with(|lock| {
+                    let reg = lock.read().expect("unable to obtain read lock");
 
-                reg.get(&self.class_name).map(|class| {
-                    let methods = class
-                        .methods()
-                        .iter()
-                        .map(|method| method.to_method_doc())
-                        .collect();
+                    reg.get(&self.class_name).map(|class| {
+                        let methods = class
+                            .methods_documented()
+                            .iter()
+                            .map(|method| method.to_method_doc())
+                            .collect();
 
-                    let props = class
-                        .properties()
-                        .iter()
-                        .map(|prop| prop.to_property_doc())
-                        .collect();
+                        let props = class
+                            .properties_documented()
+                            .iter()
+                            .map(|prop| prop.to_property_doc())
+                            .collect();
 
-                    (methods, props)
+                        let description = class.description();
+
+                        (methods, props, description)
+                    })
                 })
-            })
-            .unwrap_or_default();
+                .unwrap_or_default();
 
         let class_doc = Dictionary::new().apply(|dict| {
             dict.set(GodotString::from("name"), self.class_name());
             dict.set(GodotString::from("inherits"), self.get_instance_base_type());
             dict.set(GodotString::from("brief_description"), GodotString::new());
-            dict.set(GodotString::from("description"), GodotString::new());
+            dict.set(GodotString::from("description"), description);
             dict.set(GodotString::from("tutorials"), VariantArray::new());
             dict.set(GodotString::from("constructors"), VariantArray::new());
             dict.set(GodotString::from("methods"), methods);

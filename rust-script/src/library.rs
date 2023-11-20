@@ -21,7 +21,7 @@ use crate::{
 
 #[macro_export]
 macro_rules! register_script_class {
-    ($class_name:ty, $base_name:ty, $props:expr) => {
+    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr) => {
         $crate::private_export::plugin_add! {
             __SCRIPT_REGISTRY in crate;
             $crate::RegistryItem::Entry($crate::RustScriptEntry {
@@ -31,6 +31,7 @@ macro_rules! register_script_class {
                     $props
                 },
                 create_data: $crate::create_default_data_struct::<$class_name>,
+                description: $desc,
             })
         }
     };
@@ -86,6 +87,7 @@ pub struct RustScriptEntry {
     pub base_type_name: &'static str,
     pub properties: fn() -> Vec<RustScriptPropDesc>,
     pub create_data: fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>>,
+    pub description: &'static str,
 }
 
 #[derive(Debug)]
@@ -105,6 +107,7 @@ pub struct RustScriptPropDesc {
     pub exported: bool,
     pub hint: PropertyHint,
     pub hint_string: &'static str,
+    pub description: &'static str,
 }
 
 impl RustScriptPropDesc {
@@ -122,6 +125,7 @@ impl RustScriptPropDesc {
             },
             hint: self.hint.ord(),
             hint_string: self.hint_string.into(),
+            description: RStr::from_str(self.description),
         }
     }
 }
@@ -131,6 +135,7 @@ pub struct RustScriptMethodDesc {
     pub return_type: RustScriptPropDesc,
     pub arguments: Vec<RustScriptPropDesc>,
     pub flags: MethodFlags,
+    pub description: &'static str,
 }
 
 impl RustScriptMethodDesc {
@@ -146,6 +151,7 @@ impl RustScriptMethodDesc {
                 .into_iter()
                 .map(|arg| arg.into_property_info(class_name))
                 .collect(),
+            description: RStr::from_str(self.description),
         }
     }
 }
@@ -188,6 +194,7 @@ pub fn assemble_metadata<'a>(
                 .collect();
 
             let create_data = class.create_data;
+            let description = class.description;
 
             RemoteScriptMetaData::new(
                 class.class_name.into(),
@@ -195,6 +202,7 @@ pub fn assemble_metadata<'a>(
                 props,
                 methods,
                 create_data,
+                description.into(),
             )
         })
         .collect()

@@ -5,7 +5,7 @@ mod type_paths;
 use attribute_ops::{FieldOpts, GodotScriptOpts};
 use darling::{FromAttributes, FromDeriveInput};
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
 use type_paths::{godot_types, string_name_ty, variant_ty};
 
@@ -58,6 +58,23 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 ops.hint(field.ident.span())?
             };
 
+            let description = field
+                .attrs
+                .iter()
+                .filter(|attr| attr.path().is_ident("doc"))
+                .map(|attr| {
+                    attr.meta
+                        .require_name_value()
+                        .unwrap()
+                        .value
+                        .to_token_stream()
+                })
+                .reduce(|mut acc, comment| {
+                    acc.extend(quote!(, "\n", ));
+                    acc.extend(comment);
+                    acc
+                });
+
             let item = quote! {
                 ::godot_rust_script::RustScriptPropDesc {
                     name: #name,
@@ -65,6 +82,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     exported: #exported,
                     hint: #hint,
                     hint_string: #hint_string,
+                    description: concat!(#description),
                 },
             };
 
@@ -81,6 +99,23 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let set_fields_impl = derive_set_fields(public_fields.clone());
     let properties_state_impl = derive_property_states_export(public_fields);
     let default_impl = derive_default_with_base(&fields);
+
+    let description = opts
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .map(|attr| {
+            attr.meta
+                .require_name_value()
+                .unwrap()
+                .value
+                .to_token_stream()
+        })
+        .reduce(|mut acc, lit| {
+            acc.extend(quote!(,"\n",));
+            acc.extend(lit);
+            acc
+        });
 
     let output = quote! {
         impl ::godot_rust_script::GodotScript for #script_type_ident {
@@ -104,6 +139,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         ::godot_rust_script::register_script_class!(
             #script_type_ident,
             #base_class,
+            concat!(#description),
             vec![
                 #field_metadata
             ]
