@@ -128,6 +128,7 @@ pub struct RemoteScriptMethodInfo {
     pub return_type: RemoteScriptPropertyInfo,
     pub arguments: RVec<RemoteScriptPropertyInfo>,
     pub flags: i32,
+    pub description: RStr<'static>,
 }
 
 impl From<RemoteScriptMethodInfo> for MethodInfo {

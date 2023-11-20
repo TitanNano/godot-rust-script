@@ -21,6 +21,7 @@ pub struct ScriptMetaData {
     base_type_name: StringName,
     properties_documented: Vec<Documented<PropertyInfo>>,
     properties: Rc<Vec<PropertyInfo>>,
+    methods_documented: Vec<Documented<MethodInfo>>,
     methods: Rc<Vec<MethodInfo>>,
     create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
     description: &'static str,
@@ -51,6 +52,10 @@ impl ScriptMetaData {
         self.methods.clone()
     }
 
+    pub fn methods_documented(&self) -> &[Documented<MethodInfo>] {
+        &self.methods_documented
+    }
+
     pub fn description(&self) -> &'static str {
         self.description
     }
@@ -58,18 +63,17 @@ impl ScriptMetaData {
 
 impl From<RemoteScriptMetaData> for ScriptMetaData {
     fn from(value: RemoteScriptMetaData) -> Self {
-        let properties: Vec<Documented<PropertyInfo>> = value
-            .properties
-            .clone()
-            .into_iter()
-            .map(Into::into)
-            .collect();
-
         Self {
             class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
             base_type_name: StringName::from(&value.base_type_name.as_str()),
-            properties_documented: properties,
+            properties_documented: value
+                .properties
+                .clone()
+                .into_iter()
+                .map(Into::into)
+                .collect(),
             properties: Rc::new(value.properties.into_iter().map(Into::into).collect()),
+            methods_documented: value.methods.clone().into_iter().map(Into::into).collect(),
             methods: Rc::new(value.methods.into_iter().map(Into::into).collect()),
             create_data: value.create_data,
             description: value.description.as_str(),
@@ -181,6 +185,14 @@ impl ToMethodDoc for MethodInfo {
     }
 }
 
+impl<T: ToMethodDoc> ToMethodDoc for Documented<T> {
+    fn to_method_doc(&self) -> Dictionary {
+        self.inner
+            .to_method_doc()
+            .apply(|dict| dict.set("description", self.description))
+    }
+}
+
 #[derive(Debug)]
 pub struct Documented<T> {
     inner: T,
@@ -189,6 +201,15 @@ pub struct Documented<T> {
 
 impl From<crate::script_registry::RemoteScriptPropertyInfo> for Documented<PropertyInfo> {
     fn from(value: crate::script_registry::RemoteScriptPropertyInfo) -> Self {
+        Self {
+            description: value.description.as_str(),
+            inner: value.into(),
+        }
+    }
+}
+
+impl From<crate::script_registry::RemoteScriptMethodInfo> for Documented<MethodInfo> {
+    fn from(value: crate::script_registry::RemoteScriptMethodInfo) -> Self {
         Self {
             description: value.description.as_str(),
             inner: value.into(),

@@ -204,7 +204,7 @@ impl ScriptExtensionVirtual for RustScript {
 
                     reg.get(&self.class_name).map(|class| {
                         let methods = class
-                            .methods()
+                            .methods_documented()
                             .iter()
                             .map(|method| method.to_method_doc())
                             .collect();

@@ -135,6 +135,7 @@ pub struct RustScriptMethodDesc {
     pub return_type: RustScriptPropDesc,
     pub arguments: Vec<RustScriptPropDesc>,
     pub flags: MethodFlags,
+    pub description: &'static str,
 }
 
 impl RustScriptMethodDesc {
@@ -150,6 +151,7 @@ impl RustScriptMethodDesc {
                 .into_iter()
                 .map(|arg| arg.into_property_info(class_name))
                 .collect(),
+            description: RStr::from_str(self.description),
         }
     }
 }
