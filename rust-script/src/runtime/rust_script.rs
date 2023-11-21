@@ -3,9 +3,10 @@ use std::{ffi::c_void, ops::Deref};
 use abi_stable::std_types::RBox;
 use godot::{
     builtin::create_script_instance,
-    engine::{Engine, Script, ScriptExtension, ScriptExtensionVirtual, ScriptLanguage},
+    engine::{Engine, IScriptExtension, Script, ScriptExtension, ScriptLanguage},
+    obj::UserClass,
     prelude::{
-        godot_api, Array, Base, Dictionary, Gd, GodotClass, GodotString, Object, StringName,
+        godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, StringName,
         VariantArray,
     },
 };
@@ -30,14 +31,14 @@ pub(super) struct RustScript {
 
 impl RustScript {
     pub fn new(class_name: String) -> Gd<Self> {
-        Gd::with_base(|base| Self {
+        Gd::from_init_fn(|base| Self {
             class_name,
             source_code: String::new(),
             base,
         })
     }
 
-    pub fn class_name(&self) -> GodotString {
+    pub fn class_name(&self) -> GString {
         self.class_name.clone().into()
     }
 
@@ -61,7 +62,7 @@ impl RustScript {
 }
 
 #[godot_api]
-impl ScriptExtensionVirtual for RustScript {
+impl IScriptExtension for RustScript {
     fn init(base: Base<Self::Base>) -> Self {
         Self {
             class_name: String::new(),
@@ -70,15 +71,15 @@ impl ScriptExtensionVirtual for RustScript {
         }
     }
 
-    fn get_source_code(&self) -> GodotString {
+    fn get_source_code(&self) -> GString {
         self.source_code.clone().into()
     }
-    fn set_source_code(&mut self, code: GodotString) {
+    fn set_source_code(&mut self, code: GString) {
         self.source_code = code.to_string();
     }
 
     fn get_language(&self) -> Option<Gd<ScriptLanguage>> {
-        Some(Gd::<RustScriptLanguage>::new_default().upcast())
+        Some(RustScriptLanguage::alloc_gd().upcast())
     }
 
     fn can_instantiate(&self) -> bool {
@@ -223,24 +224,24 @@ impl ScriptExtensionVirtual for RustScript {
                 .unwrap_or_default();
 
         let class_doc = Dictionary::new().apply(|dict| {
-            dict.set(GodotString::from("name"), self.class_name());
-            dict.set(GodotString::from("inherits"), self.get_instance_base_type());
-            dict.set(GodotString::from("brief_description"), GodotString::new());
-            dict.set(GodotString::from("description"), description);
-            dict.set(GodotString::from("tutorials"), VariantArray::new());
-            dict.set(GodotString::from("constructors"), VariantArray::new());
-            dict.set(GodotString::from("methods"), methods);
-            dict.set(GodotString::from("operators"), VariantArray::new());
-            dict.set(GodotString::from("signals"), VariantArray::new());
-            dict.set(GodotString::from("constants"), VariantArray::new());
-            dict.set(GodotString::from("enums"), VariantArray::new());
-            dict.set(GodotString::from("properties"), props);
-            dict.set(GodotString::from("theme_properties"), VariantArray::new());
-            dict.set(GodotString::from("annotations"), VariantArray::new());
-            dict.set(GodotString::from("is_deprecated"), false);
-            dict.set(GodotString::from("is_experimental"), false);
-            dict.set(GodotString::from("is_script_doc"), true);
-            dict.set(GodotString::from("script_path"), self.base.get_path());
+            dict.set(GString::from("name"), self.class_name());
+            dict.set(GString::from("inherits"), self.get_instance_base_type());
+            dict.set(GString::from("brief_description"), GString::new());
+            dict.set(GString::from("description"), description);
+            dict.set(GString::from("tutorials"), VariantArray::new());
+            dict.set(GString::from("constructors"), VariantArray::new());
+            dict.set(GString::from("methods"), methods);
+            dict.set(GString::from("operators"), VariantArray::new());
+            dict.set(GString::from("signals"), VariantArray::new());
+            dict.set(GString::from("constants"), VariantArray::new());
+            dict.set(GString::from("enums"), VariantArray::new());
+            dict.set(GString::from("properties"), props);
+            dict.set(GString::from("theme_properties"), VariantArray::new());
+            dict.set(GString::from("annotations"), VariantArray::new());
+            dict.set(GString::from("is_deprecated"), false);
+            dict.set(GString::from("is_experimental"), false);
+            dict.set(GString::from("is_script_doc"), true);
+            dict.set(GString::from("script_path"), self.base.get_path());
         });
 
         Array::from(&[class_doc])

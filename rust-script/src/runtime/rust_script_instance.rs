@@ -11,10 +11,11 @@ use cfg_if::cfg_if;
 use godot::{
     builtin::ScriptInstance,
     engine::Script,
+    obj::UserClass,
     prelude::{
         godot_print,
         meta::{MethodInfo, PropertyInfo},
-        Gd, GodotString, Object, StringName, Variant, VariantType,
+        GString, Gd, Object, StringName, Variant, VariantType,
     },
 };
 
@@ -44,7 +45,7 @@ fn script_method_list(script: &Gd<RustScript>) -> Rc<Vec<MethodInfo>> {
     })
 }
 
-fn script_class_name(script: &Gd<RustScript>) -> GodotString {
+fn script_class_name(script: &Gd<RustScript>) -> GString {
     script.bind().class_name()
 }
 
@@ -170,7 +171,7 @@ cfg_if! {
 }
 
 impl ScriptInstance for RustScriptInstance {
-    fn class_name(&self) -> GodotString {
+    fn class_name(&self) -> GString {
         script_class_name(&self.script)
     }
 
@@ -247,7 +248,7 @@ impl ScriptInstance for RustScriptInstance {
             .unwrap_or(godot::sys::VariantType::Nil)
     }
 
-    fn to_string(&self) -> GodotString {
+    fn to_string(&self) -> GString {
         self.with_data(|data| data.to_string()).into_string().into()
     }
 
@@ -268,7 +269,7 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn language(&self) -> Gd<godot::engine::ScriptLanguage> {
-        Gd::<RustScriptLanguage>::new_default().upcast()
+        RustScriptLanguage::alloc_gd().upcast()
     }
 
     fn refcount_decremented(&self) -> bool {
@@ -293,7 +294,7 @@ impl RustScriptPlaceholder {
 }
 
 impl ScriptInstance for RustScriptPlaceholder {
-    fn class_name(&self) -> GodotString {
+    fn class_name(&self) -> GString {
         script_class_name(&self.script)
     }
 
@@ -353,8 +354,8 @@ impl ScriptInstance for RustScriptPlaceholder {
             .unwrap_or(VariantType::Nil)
     }
 
-    fn to_string(&self) -> GodotString {
-        GodotString::new()
+    fn to_string(&self) -> GString {
+        GString::new()
     }
 
     fn owner(&self) -> Gd<godot::prelude::Object> {
@@ -369,7 +370,7 @@ impl ScriptInstance for RustScriptPlaceholder {
     }
 
     fn language(&self) -> Gd<godot::engine::ScriptLanguage> {
-        Gd::<RustScriptLanguage>::new_default().upcast()
+        RustScriptLanguage::alloc_gd().upcast()
     }
 
     fn refcount_decremented(&self) -> bool {

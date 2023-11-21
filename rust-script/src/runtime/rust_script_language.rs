@@ -1,9 +1,9 @@
 use std::ffi::OsStr;
 
 use godot::{
-    engine::{FileAccess, ProjectSettings, Script, ScriptLanguageExtensionVirtual},
+    engine::{FileAccess, IScriptLanguageExtension, ProjectSettings, Script},
     prelude::{
-        godot_api, Array, Base, Dictionary, Gd, GodotClass, GodotString, Object, PackedStringArray,
+        godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray,
         VariantArray,
     },
 };
@@ -22,10 +22,10 @@ pub(super) struct RustScriptLanguage {
 #[godot_api]
 impl RustScriptLanguage {
     pub fn new(scripts_src_dir: Option<&'static str>) -> Gd<Self> {
-        Gd::new(Self { scripts_src_dir })
+        Gd::from_object(Self { scripts_src_dir })
     }
 
-    pub fn path_to_class_name(path: &GodotString) -> String {
+    pub fn path_to_class_name(path: &GString) -> String {
         std::path::Path::new(&path.to_string())
             .file_name()
             .and_then(OsStr::to_str)
@@ -47,17 +47,17 @@ impl RustScriptLanguage {
 }
 
 #[godot_api]
-impl ScriptLanguageExtensionVirtual for RustScriptLanguage {
-    fn get_name(&self) -> GodotString {
-        GodotString::from("Rust")
+impl IScriptLanguageExtension for RustScriptLanguage {
+    fn get_name(&self) -> GString {
+        GString::from("Rust")
     }
 
-    fn get_type(&self) -> GodotString {
-        GodotString::from("RustScript")
+    fn get_type(&self) -> GString {
+        GString::from("RustScript")
     }
 
-    fn get_extension(&self) -> GodotString {
-        GodotString::from("rs")
+    fn get_extension(&self) -> GString {
+        GString::from("rs")
     }
 
     fn supports_documentation(&self) -> bool {
@@ -85,7 +85,7 @@ impl ScriptLanguageExtensionVirtual for RustScriptLanguage {
     /// frame hook will be called for each reandered frame
     fn frame(&mut self) {}
 
-    fn handles_global_class_type(&self, type_: GodotString) -> bool {
+    fn handles_global_class_type(&self, type_: GString) -> bool {
         type_ == self.get_type()
     }
 
@@ -116,30 +116,30 @@ impl ScriptLanguageExtensionVirtual for RustScriptLanguage {
     }
 
     /// validate that the path of a new rust script is valid. Constraints for script locations can be enforced here.
-    fn validate_path(&self, path: GodotString) -> GodotString {
+    fn validate_path(&self, path: GString) -> GString {
         let Some(rs_root) = self
             .scripts_src_dir
             .map(|path| ProjectSettings::singleton().localize_path(path.into()))
         else {
-            return GodotString::from("Unable to validate script location! RustScript source location is known in the current execution context.");
+            return GString::from("Unable to validate script location! RustScript source location is known in the current execution context.");
         };
 
         if !path.to_string().starts_with(&rs_root.to_string()) {
-            return GodotString::from("rust file is not part of the scripts crate!");
+            return GString::from("rust file is not part of the scripts crate!");
         }
 
         if !FileAccess::file_exists(path) {
-            return GodotString::from("RustScripts can not be created via the Godot editor!");
+            return GString::from("RustScripts can not be created via the Godot editor!");
         }
 
-        GodotString::new()
+        GString::new()
     }
 
     fn make_template(
         &self,
-        _template: GodotString,
-        _class_name: GodotString,
-        _base_class_name: GodotString,
+        _template: GString,
+        _class_name: GString,
+        _base_class_name: GString,
     ) -> Option<Gd<Script>> {
         None
     }
@@ -152,7 +152,7 @@ impl ScriptLanguageExtensionVirtual for RustScriptLanguage {
         PackedStringArray::new()
     }
 
-    fn get_global_class_name(&self, path: GodotString) -> Dictionary {
+    fn get_global_class_name(&self, path: GString) -> Dictionary {
         let class_name = Self::path_to_class_name(&path);
 
         Dictionary::new().apply(|dict| dict.set("name", class_name))
@@ -163,17 +163,17 @@ impl ScriptLanguageExtensionVirtual for RustScriptLanguage {
     }
 
     fn get_string_delimiters(&self) -> PackedStringArray {
-        PackedStringArray::from(&[GodotString::from("\"")])
+        PackedStringArray::from(&[GString::from("\"")])
     }
 
     fn get_comment_delimiters(&self) -> PackedStringArray {
-        PackedStringArray::from(&[GodotString::from("//")])
+        PackedStringArray::from(&[GString::from("//")])
     }
 
     fn validate(
         &self,
-        _script: GodotString,
-        _path: GodotString,
+        _script: GString,
+        _path: GString,
         _validate_functions: bool,
         _validate_errors: bool,
         _validate_warnings: bool,

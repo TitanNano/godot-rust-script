@@ -10,7 +10,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-godot = { git = "https://github.com/titannano/gdext", rev = "0f9a3e22f9cbdc31e0c575a12c69d26241a92f9f" }
+godot = { git = "https://github.com/titannano/gdext", rev = "a5d17342b7b47e8af652a6a733f497c468bbd59a" }
 hot-lib-reloader = "0.6.5"
 itertools = "0.10.3"
 abi_stable = { version = "0.11.2", default-features = false }

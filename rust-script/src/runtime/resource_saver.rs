@@ -1,10 +1,9 @@
 use godot::{
     engine::{
-        file_access, global, resource_saver::SaverFlags, FileAccess, ResourceFormatSaverVirtual,
-        Script,
+        file_access, global, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script,
     },
     obj::EngineEnum,
-    prelude::{godot_api, godot_print, Gd, GodotClass, GodotString, PackedStringArray, Resource},
+    prelude::{godot_api, godot_print, GString, Gd, GodotClass, PackedStringArray, Resource},
 };
 
 use super::rust_script::RustScript;
@@ -14,8 +13,8 @@ use super::rust_script::RustScript;
 pub struct RustScriptResourceSaver;
 
 #[godot_api]
-impl ResourceFormatSaverVirtual for RustScriptResourceSaver {
-    fn save(&mut self, resource: Gd<Resource>, path: GodotString, flags: u32) -> global::Error {
+impl IResourceFormatSaver for RustScriptResourceSaver {
+    fn save(&mut self, resource: Gd<Resource>, path: GString, flags: u32) -> global::Error {
         let mut script: Gd<Script> = resource.cast();
 
         godot_print!("saving rust script resource to: {}", path);
@@ -42,9 +41,9 @@ impl ResourceFormatSaverVirtual for RustScriptResourceSaver {
         resource.try_cast::<RustScript>().is_some()
     }
     fn get_recognized_extensions(&self, _resource: Gd<Resource>) -> PackedStringArray {
-        PackedStringArray::from(&[GodotString::from("rs")])
+        PackedStringArray::from(&[GString::from("rs")])
     }
-    fn recognize_path(&self, _resource: Gd<Resource>, _path: GodotString) -> bool {
+    fn recognize_path(&self, _resource: Gd<Resource>, _path: GString) -> bool {
         true
     }
 }

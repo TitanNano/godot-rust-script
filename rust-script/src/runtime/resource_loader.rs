@@ -1,10 +1,7 @@
 use godot::{
-    engine::{
-        file_access, FileAccess, ResourceFormatLoaderVirtual, Script,
-        ScriptLanguageExtensionVirtual,
-    },
+    engine::{file_access, FileAccess, IResourceFormatLoader, IScriptLanguageExtension, Script},
     prelude::{
-        godot_api, Gd, GodotClass, GodotString, PackedStringArray, StringName, ToGodot, Variant,
+        godot_api, GString, Gd, GodotClass, PackedStringArray, StringName, ToGodot, Variant,
     },
 };
 
@@ -18,23 +15,24 @@ pub(super) struct RustScriptResourceLoader {
 
 impl RustScriptResourceLoader {
     pub fn new(script_lang: Gd<RustScriptLanguage>) -> Gd<Self> {
-        Gd::new(Self { script_lang })
+        Gd::from_object(Self { script_lang })
     }
 }
 
 #[godot_api]
-impl ResourceFormatLoaderVirtual for RustScriptResourceLoader {
+impl IResourceFormatLoader for RustScriptResourceLoader {
     fn handles_type(&self, type_: StringName) -> bool {
         type_ == StringName::from("Script") || type_ == self.script_lang.bind().get_type().into()
     }
-    fn get_resource_type(&self, path: GodotString) -> GodotString {
+
+    fn get_resource_type(&self, path: GString) -> GString {
         let script_lang = self.script_lang.bind();
         let ext_match = path
             .to_string()
             .ends_with(&script_lang.get_extension().to_string());
 
         if !ext_match {
-            return GodotString::new();
+            return GString::new();
         }
 
         script_lang.get_type()
@@ -46,8 +44,8 @@ impl ResourceFormatLoaderVirtual for RustScriptResourceLoader {
 
     fn load(
         &self,
-        path: GodotString,
-        original_path: GodotString,
+        path: GString,
+        original_path: GString,
         _use_sub_threads: bool,
         _cache_mode: i32,
     ) -> Variant {
