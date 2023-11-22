@@ -269,16 +269,24 @@ fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
                 Err(err) => return err.write_errors(),
             };
 
-            let variant_value = quote!(#godot_types::prelude::FromGodot::from_variant(&value));
+            let variant_value = quote!(#godot_types::prelude::FromGodot::try_from_variant(&value));
 
             let assignment = match opts.set {
-                Some(setter) => quote_spanned!(setter.span() => #setter(self, #variant_value)),
-                None => quote!(self.#field_ident = #variant_value),
+                Some(setter) => quote_spanned!(setter.span() => #setter(self, local_value)),
+                None => quote!(self.#field_ident = local_value),
             };
 
             quote_spanned! {
                 field_ident.span() =>
-                #field_name => #assignment,
+                #field_name => {
+                    let local_value = match #variant_value {
+                        Ok(v) => v,
+                        Err(_) => return false,
+                    };
+
+                    #assignment;
+                    true
+                },
             }
         })
         .collect();
@@ -288,10 +296,8 @@ fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
             match name.to_string().as_str() {
                 #set_field_dispatch
 
-                _ => return false,
+                _ => false,
             }
-
-            true
         }
     }
 }
