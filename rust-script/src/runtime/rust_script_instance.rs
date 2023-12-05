@@ -212,6 +212,8 @@ impl ScriptInstance for RustScriptInstance {
         self.with_data_mut(move |data| data.call(method, rargs))
             .map(Into::into)
             .into_result()
+            // GDExtensionCallErrorType is not guaranteed to be a u32
+            .map_err(|err: u32| err as godot::sys::GDExtensionCallErrorType)
     }
 
     fn get_script(&self) -> Gd<Script> {
