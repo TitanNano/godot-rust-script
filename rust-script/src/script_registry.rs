@@ -54,6 +54,8 @@ where
 
         self.call(method.as_str().into(), &args)
             .map(RemoteValue::from)
+            // GDExtensionCallErrorType is not guaranteed to be a u32
+            .map_err(godot_call_error_type_to_u32)
             .into()
     }
 
@@ -377,4 +379,14 @@ impl<'a> RemoteValueRef<'a> {
     fn as_ref(&self) -> &'a Variant {
         unsafe { &*(self.ptr as *const Variant) }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn godot_call_error_type_to_u32(err: godot::sys::GDExtensionCallErrorType) -> u32 {
+    err
+}
+
+#[cfg(target_os = "windows")]
+fn godot_call_error_type_to_u32(err: godot::sys::GDExtensionCallErrorType) -> u32 {
+    err as u32
 }
