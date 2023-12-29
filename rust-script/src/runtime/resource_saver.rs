@@ -2,7 +2,7 @@ use godot::{
     engine::{
         file_access, global, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script,
     },
-    obj::EngineEnum,
+    obj::EngineBitfield,
     prelude::{godot_api, godot_print, GString, Gd, GodotClass, PackedStringArray, Resource},
 };
 
@@ -19,7 +19,7 @@ impl IResourceFormatSaver for RustScriptResourceSaver {
 
         godot_print!("saving rust script resource to: {}", path);
 
-        if flags as i32 & SaverFlags::FLAG_CHANGE_PATH.ord() > 0 {
+        if flags as u64 & SaverFlags::FLAG_CHANGE_PATH.ord() > 0 {
             script.set_path(path.clone());
         }
 
@@ -38,7 +38,7 @@ impl IResourceFormatSaver for RustScriptResourceSaver {
         global::Error::OK
     }
     fn recognize(&self, resource: Gd<Resource>) -> bool {
-        resource.try_cast::<RustScript>().is_some()
+        resource.try_cast::<RustScript>().is_ok()
     }
     fn get_recognized_extensions(&self, _resource: Gd<Resource>) -> PackedStringArray {
         PackedStringArray::from(&[GString::from("rs")])

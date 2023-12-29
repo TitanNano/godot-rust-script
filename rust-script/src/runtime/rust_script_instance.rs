@@ -1,9 +1,10 @@
+#[cfg(all(feature = "hot-reload", debug_assertions))]
+use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
 
 use abi_stable::std_types::{RBox, RString};
 use godot::{
-    builtin::ScriptInstance,
-    engine::Script,
+    engine::{Script, ScriptInstance},
     obj::UserClass,
     prelude::{
         godot_print,
@@ -23,48 +24,68 @@ fn script_method_list(script: &Gd<RustScript>) -> Rc<Vec<MethodInfo>> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
-    SCRIPT_REGISTRY.with(|lock| {
-        lock.read()
-            .expect("script registry is inaccessible")
-            .get(class_name)
-            .map(|meta| meta.methods())
-            .unwrap_or_default()
-    })
+    let methods = SCRIPT_REGISTRY
+        .read()
+        .expect("script registry is inaccessible")
+        .get(&class_name)
+        .map(|meta| {
+            Rc::new(
+                meta.methods()
+                    .into_iter()
+                    .map(|method| MethodInfo::from(method.to_owned()))
+                    .collect(),
+            )
+        })
+        .unwrap_or_default();
+
+    methods
 }
 
 fn script_class_name(script: &Gd<RustScript>) -> GString {
-    script.bind().class_name()
+    script.bind().get_class_name()
 }
 
 fn script_property_list(script: &Gd<RustScript>) -> Rc<Vec<PropertyInfo>> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
-    SCRIPT_REGISTRY.with(|lock| {
-        lock.read()
-            .expect("script registry is inaccessible")
-            .get(class_name)
-            .map(|meta| meta.properties())
-            .unwrap_or_default()
-    })
+    let props = SCRIPT_REGISTRY
+        .read()
+        .expect("script registry is inaccessible")
+        .get(&class_name)
+        .map(|meta| {
+            Rc::new(
+                meta.properties()
+                    .into_iter()
+                    .map(|prop| PropertyInfo::from(prop.to_owned()))
+                    .collect(),
+            )
+        })
+        .unwrap_or_default();
+
+    props
 }
 
 pub(super) struct RustScriptInstance {
     data: RemoteGodotScript_TO<'static, RBox<()>>,
 
-    gd_object: Gd<Object>,
     script: Gd<RustScript>,
+    generic_script: Gd<Script>,
+    property_list: Rc<Vec<PropertyInfo>>,
+    method_list: Rc<Vec<MethodInfo>>,
 }
 
 impl RustScriptInstance {
     pub fn new(
         data: RemoteGodotScript_TO<'static, RBox<()>>,
-        gd_object: Gd<Object>,
+        _gd_object: Gd<Object>,
         script: Gd<RustScript>,
     ) -> Self {
         Self {
             data,
-            gd_object,
+            generic_script: script.clone().upcast(),
+            property_list: script_property_list(&script),
+            method_list: script_method_list(&script),
             script,
         }
     }
@@ -104,12 +125,12 @@ impl ScriptInstance for RustScriptInstance {
             .into()
     }
 
-    fn property_list(&self) -> Rc<Vec<PropertyInfo>> {
-        script_property_list(&self.script)
+    fn get_property_list(&self) -> &[PropertyInfo] {
+        self.property_list.as_ref()
     }
 
-    fn method_list(&self) -> Rc<Vec<MethodInfo>> {
-        script_method_list(&self.script)
+    fn get_method_list(&self) -> &[MethodInfo] {
+        self.method_list.as_ref()
     }
 
     fn call(
@@ -129,34 +150,23 @@ impl ScriptInstance for RustScriptInstance {
             .map_err(|err: u32| err as godot::sys::GDExtensionCallErrorType)
     }
 
-    fn get_script(&self) -> Gd<Script> {
-        self.script.clone().upcast()
+    fn get_script(&self) -> &Gd<Script> {
+        &self.generic_script
     }
 
     fn is_placeholder(&self) -> bool {
         false
     }
 
-    fn has_method(&self, method: StringName) -> bool {
-        let rs = self.script.bind();
-        let class_name = rs.str_class_name();
-
-        SCRIPT_REGISTRY.with(|lock| {
-            lock.read()
-                .expect("script registry is not accessible")
-                .get(class_name)
-                .and_then(|meta| {
-                    meta.methods()
-                        .iter()
-                        .find(|m| m.method_name == method)
-                        .map(|_| ())
-                })
-                .is_some()
-        })
+    fn has_method(&self, method_name: StringName) -> bool {
+        self.method_list
+            .iter()
+            .find(|method| method.method_name == method_name)
+            .is_some()
     }
 
     fn get_property_type(&self, name: StringName) -> godot::sys::VariantType {
-        self.property_list()
+        self.get_property_list()
             .iter()
             .find(|prop| prop.property_name == name)
             .map(|prop| prop.variant_type)
@@ -167,13 +177,8 @@ impl ScriptInstance for RustScriptInstance {
         self.with_data(|data| data.to_string()).into_string().into()
     }
 
-    fn owner(&self) -> Gd<godot::prelude::Object> {
-        self.gd_object.clone().upcast()
-    }
-
-    fn property_state(&self) -> Vec<(StringName, Variant)> {
-        self.property_list()
-            .as_slice()
+    fn get_property_state(&self) -> Vec<(StringName, Variant)> {
+        self.get_property_list()
             .iter()
             .map(|prop| &prop.property_name)
             .filter_map(|name| {
@@ -183,27 +188,41 @@ impl ScriptInstance for RustScriptInstance {
             .collect()
     }
 
-    fn language(&self) -> Gd<godot::engine::ScriptLanguage> {
+    fn get_language(&self) -> Gd<godot::engine::ScriptLanguage> {
         RustScriptLanguage::alloc_gd().upcast()
     }
 
-    fn refcount_decremented(&self) -> bool {
+    fn on_refcount_decremented(&self) -> bool {
         true
     }
 
-    fn refcount_incremented(&self) {}
+    fn on_refcount_incremented(&self) {}
+
+    fn property_get_fallback(&self, _name: StringName) -> Option<Variant> {
+        None
+    }
+
+    fn property_set_fallback(&mut self, _name: StringName, _value: &Variant) -> bool {
+        false
+    }
 }
 
 pub(super) struct RustScriptPlaceholder {
     script: Gd<RustScript>,
+    generic_script: Gd<Script>,
     properties: HashMap<StringName, Variant>,
+    property_list: Rc<Vec<PropertyInfo>>,
+    method_list: Rc<Vec<MethodInfo>>,
 }
 
 impl RustScriptPlaceholder {
     pub fn new(script: Gd<RustScript>) -> Self {
         Self {
-            script,
+            generic_script: script.clone().upcast(),
             properties: Default::default(),
+            property_list: script_property_list(&script),
+            method_list: script_method_list(&script),
+            script,
         }
     }
 }
@@ -215,7 +234,7 @@ impl ScriptInstance for RustScriptPlaceholder {
 
     fn set(&mut self, name: StringName, value: &Variant) -> bool {
         let exists = self
-            .property_list()
+            .get_property_list()
             .iter()
             .any(|prop| prop.property_name == name);
 
@@ -231,12 +250,12 @@ impl ScriptInstance for RustScriptPlaceholder {
         self.properties.get(&name).cloned()
     }
 
-    fn property_list(&self) -> Rc<Vec<PropertyInfo>> {
-        script_property_list(&self.script)
+    fn get_property_list(&self) -> &[PropertyInfo] {
+        self.property_list.as_ref()
     }
 
-    fn method_list(&self) -> Rc<Vec<MethodInfo>> {
-        script_method_list(&self.script)
+    fn get_method_list(&self) -> &[MethodInfo] {
+        self.method_list.as_ref()
     }
 
     fn call(
@@ -247,12 +266,12 @@ impl ScriptInstance for RustScriptPlaceholder {
         Err(godot::sys::GDEXTENSION_CALL_OK)
     }
 
-    fn get_script(&self) -> Gd<Script> {
-        self.script.clone().upcast()
+    fn get_script(&self) -> &Gd<Script> {
+        &self.generic_script
     }
 
     fn has_method(&self, method_name: StringName) -> bool {
-        self.method_list()
+        self.get_method_list()
             .iter()
             .any(|method| method.method_name == method_name)
     }
@@ -262,7 +281,7 @@ impl ScriptInstance for RustScriptPlaceholder {
     }
 
     fn get_property_type(&self, name: StringName) -> godot::sys::VariantType {
-        self.property_list()
+        self.get_property_list()
             .iter()
             .find(|prop| prop.property_name == name)
             .map(|prop| prop.variant_type)
@@ -273,24 +292,28 @@ impl ScriptInstance for RustScriptPlaceholder {
         GString::new()
     }
 
-    fn owner(&self) -> Gd<godot::prelude::Object> {
-        self.script.clone().upcast()
-    }
-
-    fn property_state(&self) -> Vec<(StringName, Variant)> {
+    fn get_property_state(&self) -> Vec<(StringName, Variant)> {
         self.properties
             .iter()
             .map(|(name, value)| (name.to_owned(), value.to_owned()))
             .collect()
     }
 
-    fn language(&self) -> Gd<godot::engine::ScriptLanguage> {
+    fn get_language(&self) -> Gd<godot::engine::ScriptLanguage> {
         RustScriptLanguage::alloc_gd().upcast()
     }
 
-    fn refcount_decremented(&self) -> bool {
+    fn on_refcount_decremented(&self) -> bool {
         true
     }
 
-    fn refcount_incremented(&self) {}
+    fn on_refcount_incremented(&self) {}
+
+    fn property_get_fallback(&self, _name: StringName) -> Option<Variant> {
+        None
+    }
+
+    fn property_set_fallback(&mut self, _name: StringName, _value: &Variant) -> bool {
+        false
+    }
 }

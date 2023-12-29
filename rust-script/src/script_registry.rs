@@ -7,7 +7,7 @@ use abi_stable::{
 };
 use godot::{
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
-    obj::EngineEnum,
+    obj::{EngineBitfield, EngineEnum},
     prelude::{
         godot_print,
         meta::{ClassName, MethodInfo, PropertyInfo},
@@ -102,7 +102,7 @@ pub struct RemoteScriptPropertyInfo {
     pub class_name: RStr<'static>,
     pub hint: i32,
     pub hint_string: RStr<'static>,
-    pub usage: i32,
+    pub usage: u64,
     pub description: RStr<'static>,
 }
 
@@ -129,7 +129,7 @@ pub struct RemoteScriptMethodInfo {
     pub class_name: RStr<'static>,
     pub return_type: RemoteScriptPropertyInfo,
     pub arguments: RVec<RemoteScriptPropertyInfo>,
-    pub flags: i32,
+    pub flags: u64,
     pub description: RStr<'static>,
 }
 
@@ -183,13 +183,13 @@ impl RemoteScriptMetaData {
 }
 
 #[abi_stable::sabi_trait]
-pub trait CreateScriptInstanceData: Debug {
+pub trait CreateScriptInstanceData: Debug + Sync + Send {
     fn create(&self, base: RemoteValue) -> RemoteGodotScript_TO<'static, RBox<()>>;
 }
 
 impl<F> CreateScriptInstanceData for F
 where
-    F: Fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> + Debug,
+    F: Fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> + Debug + Sync + Send,
 {
     fn create(&self, base: RemoteValue) -> RemoteGodotScript_TO<'static, RBox<()>> {
         let variant: Variant = base.into();
