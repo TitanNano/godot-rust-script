@@ -58,20 +58,9 @@ macro_rules! setup_library {
         $crate::private_export::plugin_registry!(pub __SCRIPT_REGISTRY: $crate::RegistryItem);
 
         #[no_mangle]
-        pub fn __godot_rust_script_init(binding: Option<$crate::private_export::BindingInit>) -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
+        pub fn __godot_rust_script_init() -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
             use $crate::private_export::*;
             use $crate::godot::obj::EngineEnum;
-
-            if let Some(init) = binding {
-                let config = $crate::godot::sys::GdextConfig {
-                    tool_only_in_editor: false,
-                    is_editor: ::std::cell::OnceCell::new(),
-                };
-
-                unsafe {
-                    $crate::godot::sys::init_with_existing_binding(init);
-                }
-            }
 
             let lock = __godot_rust_plugin___SCRIPT_REGISTRY.lock().expect("unable to aquire mutex lock");
 

@@ -16,12 +16,9 @@ pub use runtime::*;
 pub use godot_rust_script_derive::{godot_script_impl, GodotScript};
 
 pub mod private_export {
-    pub use super::{script_registry::RemoteVariantType, shared::BindingInit};
+    pub use super::script_registry::RemoteVariantType;
     pub use abi_stable::std_types::{RStr, RString, RVec};
     pub use godot::sys::{plugin_add, plugin_registry};
-
-    #[cfg(all(feature = "hot-reload", debug_assertions))]
-    pub use hot_lib_reloader::{self, hot_module};
 }
 
 pub use godot;

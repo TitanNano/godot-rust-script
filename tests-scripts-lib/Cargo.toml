@@ -7,10 +7,5 @@ edition.workspace = true
 crate-type = ["dylib", "rlib"]
 
 [dependencies]
-godot-rust-script = { path = "../rust-script", features = ["hot-reload", "scripts"] }
-
-[features]
-test-hot-reload = ["godot-rust-script/hot-reload"]
-
-
+godot-rust-script = { path = "../rust-script", features = ["scripts"] }
 

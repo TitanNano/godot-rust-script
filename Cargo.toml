@@ -11,16 +11,13 @@ edition = "2021"
 
 [workspace.dependencies]
 godot = { git = "https://github.com/titannano/gdext", rev = "a5d17342b7b47e8af652a6a733f497c468bbd59a" }
-hot-lib-reloader = "0.6.5"
 itertools = "0.10.3"
 abi_stable = { version = "0.11.2", default-features = false }
 rand = "0.8.5"
-cfg-if = "1.0.0"
 darling = { version = "0.20.3" }
 proc-macro2 = "1.0.68"
 quote = "1.0.33"
 syn = "2.0.38"
-process_path = "0.1"
 
 godot-rust-script-derive = { path = "derive" }
 tests-scripts-lib = { path = "tests-scripts-lib" }
