@@ -5,10 +5,7 @@ mod rust_script;
 mod rust_script_instance;
 mod rust_script_language;
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, RwLock},
-};
+use std::{collections::HashMap, sync::RwLock};
 
 use godot::{
     bind::GodotClass,
@@ -55,8 +52,7 @@ macro_rules! deinit {
     };
 }
 
-static SCRIPT_REGISTRY: Lazy<RwLock<HashMap<String, ScriptMetaData>>> =
-    Lazy::new(RwLock::default);
+static SCRIPT_REGISTRY: Lazy<RwLock<HashMap<String, ScriptMetaData>>> = Lazy::new(RwLock::default);
 
 #[derive(GodotClass)]
 #[class(base = Object, init)]
@@ -90,7 +86,7 @@ impl RustScriptExtensionLayer {
         let mut engine = Engine::singleton();
 
         godot_print!("loading rust scripts...");
-        load_rust_scripts(Arc::new(lib_init_fn));
+        load_rust_scripts(lib_init_fn);
 
         engine.register_script_language(lang.clone().upcast());
         engine.register_singleton(
@@ -166,7 +162,7 @@ impl RustScriptExtensionLayer {
     }
 }
 
-fn load_rust_scripts(lib_init_fn: Arc<dyn RustScriptLibInit>) {
+fn load_rust_scripts<F: RustScriptLibInit>(lib_init_fn: F) {
     let result = lib_init_fn();
 
     let registry: HashMap<String, ScriptMetaData> = result
