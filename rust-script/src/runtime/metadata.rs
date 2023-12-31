@@ -14,9 +14,8 @@ use crate::{
     apply::Apply,
     script_registry::{
         CreateScriptInstanceData_TO, RemoteGodotScript_TO, RemoteScriptMetaData,
-        RemoteScriptPropertyInfo,
+        RemoteScriptMethodInfo, RemoteScriptPropertyInfo,
     },
-    RemoteScriptMethodInfo,
 };
 
 #[derive(Debug)]

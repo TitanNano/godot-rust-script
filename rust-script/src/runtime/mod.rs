@@ -56,7 +56,7 @@ macro_rules! deinit {
 }
 
 static SCRIPT_REGISTRY: Lazy<RwLock<HashMap<String, ScriptMetaData>>> =
-    Lazy::new(|| RwLock::default());
+    Lazy::new(RwLock::default);
 
 #[derive(GodotClass)]
 #[class(base = Object, init)]

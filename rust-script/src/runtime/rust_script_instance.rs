@@ -31,7 +31,7 @@ fn script_method_list(script: &Gd<RustScript>) -> Rc<Vec<MethodInfo>> {
         .map(|meta| {
             Rc::new(
                 meta.methods()
-                    .into_iter()
+                    .iter()
                     .map(|method| MethodInfo::from(method.to_owned()))
                     .collect(),
             )
@@ -56,7 +56,7 @@ fn script_property_list(script: &Gd<RustScript>) -> Rc<Vec<PropertyInfo>> {
         .map(|meta| {
             Rc::new(
                 meta.properties()
-                    .into_iter()
+                    .iter()
                     .map(|prop| PropertyInfo::from(prop.to_owned()))
                     .collect(),
             )
@@ -161,8 +161,7 @@ impl ScriptInstance for RustScriptInstance {
     fn has_method(&self, method_name: StringName) -> bool {
         self.method_list
             .iter()
-            .find(|method| method.method_name == method_name)
-            .is_some()
+            .any(|method| method.method_name == method_name)
     }
 
     fn get_property_type(&self, name: StringName) -> godot::sys::VariantType {

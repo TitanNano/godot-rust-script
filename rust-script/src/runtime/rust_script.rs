@@ -118,7 +118,7 @@ impl RustScript {
 
         *self.owners.borrow_mut() = ids
             .iter_shared()
-            .map(|raw_id| InstanceId::from_i64(raw_id))
+            .map(InstanceId::from_i64)
             .filter_map(|id| {
                 godot_print!(
                     "reloading script instance of {}, {}",
@@ -193,7 +193,7 @@ impl IScriptExtension for RustScript {
         let data = self.create_remote_instance(for_object.clone());
         let instance = RustScriptInstance::new(data, for_object, self.base.deref().clone().cast());
 
-        create_script_instance(instance) as *mut c_void
+        create_script_instance(instance)
     }
 
     unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
@@ -208,7 +208,7 @@ impl IScriptExtension for RustScript {
 
         let placeholder = RustScriptPlaceholder::new(self.base.deref().clone().cast());
 
-        create_script_instance(placeholder) as *mut c_void
+        create_script_instance(placeholder)
     }
 
     fn is_valid(&self) -> bool {
@@ -260,7 +260,7 @@ impl IScriptExtension for RustScript {
             class
                 .methods()
                 .iter()
-                .any(|method| method.method_name.to_string() == method_name.to_string())
+                .any(|method| method.method_name == method_name.to_string())
         })
     }
 
@@ -276,7 +276,7 @@ impl IScriptExtension for RustScript {
                 class
                     .methods()
                     .iter()
-                    .find(|method| method.method_name.to_string() == method_name.to_string())
+                    .find(|method| method.method_name == method_name.to_string())
                     .map(|method| MethodInfo::from(method.to_owned()).to_dict())
             })
             .unwrap_or_default()
@@ -369,16 +369,13 @@ impl IScriptExtension for RustScript {
     }
 
     fn on_notification(&mut self, what: ObjectNotification) {
-        match what {
-            ObjectNotification::Unknown(NOTIFICATION_EXTENSION_RELOADED) => {
-                godot_print!(
-                    "RustScript({}): received extension reloaded notification!",
-                    self.str_class_name()
-                );
+        if let ObjectNotification::Unknown(NOTIFICATION_EXTENSION_RELOADED) = what {
+            godot_print!(
+                "RustScript({}): received extension reloaded notification!",
+                self.str_class_name()
+            );
 
-                self.reload(false);
-            }
-            _ => (),
+            self.reload(false);
         }
     }
 }
