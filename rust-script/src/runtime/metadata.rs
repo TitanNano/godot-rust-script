@@ -1,8 +1,8 @@
-use std::{ops::Deref, rc::Rc};
+use std::ops::Deref;
 
 use abi_stable::std_types::RBox;
 use godot::{
-    obj::EngineEnum,
+    obj::{EngineBitfield, EngineEnum},
     prelude::{
         meta::{ClassName, MethodInfo, PropertyInfo},
         Array, Dictionary, Gd, Object, StringName, ToGodot,
@@ -12,17 +12,18 @@ use godot::{
 
 use crate::{
     apply::Apply,
-    script_registry::{CreateScriptInstanceData_TO, RemoteGodotScript_TO, RemoteScriptMetaData},
+    script_registry::{
+        CreateScriptInstanceData_TO, RemoteGodotScript_TO, RemoteScriptMetaData,
+        RemoteScriptMethodInfo, RemoteScriptPropertyInfo,
+    },
 };
 
 #[derive(Debug)]
 pub struct ScriptMetaData {
     class_name: ClassName,
     base_type_name: StringName,
-    properties_documented: Vec<Documented<PropertyInfo>>,
-    properties: Rc<Vec<PropertyInfo>>,
-    methods_documented: Vec<Documented<MethodInfo>>,
-    methods: Rc<Vec<MethodInfo>>,
+    properties: Vec<RemoteScriptPropertyInfo>,
+    methods: Vec<RemoteScriptMethodInfo>,
     create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
     description: &'static str,
 }
@@ -40,20 +41,12 @@ impl ScriptMetaData {
         self.create_data.create(base.to_variant().into())
     }
 
-    pub fn properties(&self) -> Rc<Vec<PropertyInfo>> {
-        self.properties.clone()
+    pub fn properties(&self) -> &[RemoteScriptPropertyInfo] {
+        &self.properties
     }
 
-    pub fn properties_documented(&self) -> &[Documented<PropertyInfo>] {
-        &self.properties_documented
-    }
-
-    pub fn methods(&self) -> Rc<Vec<MethodInfo>> {
-        self.methods.clone()
-    }
-
-    pub fn methods_documented(&self) -> &[Documented<MethodInfo>] {
-        &self.methods_documented
+    pub fn methods(&self) -> &[RemoteScriptMethodInfo] {
+        &self.methods
     }
 
     pub fn description(&self) -> &'static str {
@@ -66,15 +59,8 @@ impl From<RemoteScriptMetaData> for ScriptMetaData {
         Self {
             class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
             base_type_name: StringName::from(&value.base_type_name.as_str()),
-            properties_documented: value
-                .properties
-                .clone()
-                .into_iter()
-                .map(Into::into)
-                .collect(),
-            properties: Rc::new(value.properties.into_iter().map(Into::into).collect()),
-            methods_documented: value.methods.clone().into_iter().map(Into::into).collect(),
-            methods: Rc::new(value.methods.into_iter().map(Into::into).collect()),
+            properties: value.properties.to_vec(),
+            methods: value.methods.to_vec(),
             create_data: value.create_data,
             description: value.description.as_str(),
         }

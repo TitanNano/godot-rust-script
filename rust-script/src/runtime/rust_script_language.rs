@@ -2,8 +2,9 @@ use std::ffi::OsStr;
 
 use godot::{
     engine::{FileAccess, IScriptLanguageExtension, ProjectSettings, Script},
+    obj::Base,
     prelude::{
-        godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray,
+        godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray,
         VariantArray,
     },
 };
@@ -49,7 +50,7 @@ impl RustScriptLanguage {
 #[godot_api]
 impl IScriptLanguageExtension for RustScriptLanguage {
     fn get_name(&self) -> GString {
-        GString::from("Rust")
+        GString::from("RustScript")
     }
 
     fn get_type(&self) -> GString {
@@ -192,4 +193,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     fn debug_get_current_stack_info(&mut self) -> Array<Dictionary> {
         Array::default()
     }
+
+    // godot hook to trigger script reload
+    fn reload_all_scripts(&mut self) {}
 }

@@ -6,7 +6,7 @@ use abi_stable::{
 };
 use godot::{
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
-    obj::EngineEnum,
+    obj::{EngineBitfield, EngineEnum},
     prelude::{Gd, Object},
     sys::VariantType,
 };
@@ -90,6 +90,7 @@ pub enum RegistryItem {
     Methods(RustScriptEntryMethods),
 }
 
+#[derive(Debug)]
 pub struct RustScriptPropDesc {
     pub name: &'static str,
     pub ty: VariantType,
