@@ -86,3 +86,22 @@ jobs:
       - name: Tests
         run: |
           cargo test
+
+  license:
+    runs-on: "ubuntu-22.04"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install ENV
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install nushell
+
+      - name: Check License Headers
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          ./license_header.nu
+          git diff
+          test $(git diff | wc -l) -eq 0
