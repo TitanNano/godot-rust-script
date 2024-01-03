@@ -13,7 +13,6 @@ use godot::{
     engine::{Script, ScriptInstance},
     obj::UserClass,
     prelude::{
-        godot_print,
         meta::{MethodInfo, PropertyInfo},
         GString, Gd, Object, StringName, Variant, VariantType,
     },
@@ -144,7 +143,6 @@ impl ScriptInstance for RustScriptInstance {
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        godot_print!("calling {}::{}", self.class_name(), method);
         let method =
             RString::with_capacity(method.len()).apply(|s| s.push_str(&method.to_string()));
         let rargs = args.iter().map(|v| RemoteValueRef::new(v)).collect();
@@ -268,7 +266,7 @@ impl ScriptInstance for RustScriptPlaceholder {
         _method: StringName,
         _args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        Err(godot::sys::GDEXTENSION_CALL_OK)
+        Err(godot::sys::GDEXTENSION_CALL_ERROR_INVALID_METHOD)
     }
 
     fn get_script(&self) -> &Gd<Script> {

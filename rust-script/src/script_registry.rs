@@ -15,7 +15,6 @@ use godot::{
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
     obj::{EngineBitfield, EngineEnum},
     prelude::{
-        godot_print,
         meta::{ClassName, MethodInfo, PropertyInfo},
         Gd, Object, StringName, Variant,
     },
@@ -36,12 +35,6 @@ where
     T: GodotScript,
 {
     fn set(&mut self, name: RString, value: RemoteValueRef) -> bool {
-        godot_print!(
-            "RemoteGodotScript received set_func for \"{}\": {:?}",
-            name,
-            value
-        );
-
         self.set(StringName::from(name.as_str()), value.as_ref().to())
     }
 
