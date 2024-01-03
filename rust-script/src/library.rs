@@ -29,7 +29,7 @@ use crate::{
 macro_rules! register_script_class {
     ($class_name:ty, $base_name:ty, $desc:expr, $props:expr) => {
         $crate::private_export::plugin_add! {
-            __SCRIPT_REGISTRY in crate;
+        SCRIPT_REGISTRY in $crate::private_export;
             $crate::RegistryItem::Entry($crate::RustScriptEntry {
                 class_name: concat!(stringify!($class_name), "\0"),
                 base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_name().as_str(),
@@ -47,7 +47,7 @@ macro_rules! register_script_class {
 macro_rules! register_script_methods {
     ($class_name:ty, $methods:expr) => {
         $crate::private_export::plugin_add! {
-            __SCRIPT_REGISTRY in crate;
+            SCRIPT_REGISTRY in $crate::private_export;
             $crate::RegistryItem::Methods($crate::RustScriptEntryMethods {
                 class_name: concat!(stringify!($class_name), "\0"),
                 methods: || {
@@ -61,19 +61,31 @@ macro_rules! register_script_methods {
 #[macro_export]
 macro_rules! setup_library {
     () => {
-        $crate::private_export::plugin_registry!(pub __SCRIPT_REGISTRY: $crate::RegistryItem);
-
         #[no_mangle]
-        pub fn __godot_rust_script_init() -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
-            use $crate::private_export::*;
+        pub fn __godot_rust_script_init(
+        ) -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
             use $crate::godot::obj::EngineEnum;
+            use $crate::private_export::*;
 
-            let lock = __godot_rust_plugin___SCRIPT_REGISTRY.lock().expect("unable to aquire mutex lock");
+            let lock = $crate::private_export::__godot_rust_plugin_SCRIPT_REGISTRY
+                .lock()
+                .expect("unable to aquire mutex lock");
 
             $crate::assemble_metadata(lock.iter())
         }
 
-        pub const __GODOT_RUST_SCRIPT_SRC_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src");
+        pub const __GODOT_RUST_SCRIPT_SRC_ROOT: &str = $crate::private_export::concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/src",
+            $crate::private_export::replace!(
+                $crate::private_export::unwrap!($crate::private_export::strip_prefix!(
+                    module_path!(),
+                    $crate::private_export::replace!(env!("CARGO_PKG_NAME"), "-", "_")
+                )),
+                "::",
+                "/"
+            ),
+        );
     };
 }
 

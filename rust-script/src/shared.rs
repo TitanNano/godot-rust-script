@@ -6,8 +6,10 @@
 
 use abi_stable::std_types::RVec;
 
-use crate::script_registry::RemoteScriptMetaData;
+use crate::{script_registry::RemoteScriptMetaData, RegistryItem};
 
 pub trait RustScriptLibInit: Fn() -> RVec<RemoteScriptMetaData> {}
 
 impl<F> RustScriptLibInit for F where F: Fn() -> RVec<RemoteScriptMetaData> {}
+
+godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);

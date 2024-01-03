@@ -14,12 +14,13 @@ rand = { workspace = true, optional = true }
 
 godot-rust-script-derive = { workspace = true, optional = true }
 once_cell = "1.19.0"
+const-str.workspace = true
 
 [dev-dependencies]
 tests-scripts-lib = { path = "../tests-scripts-lib" }
 godot-rust-script = { path = "./", features = ["runtime"] }
 
 [features]
-default = []
+default = ["runtime", "scripts"]
 runtime = ["dep:itertools", "dep:rand"]
 scripts = ["dep:godot-rust-script-derive"]
