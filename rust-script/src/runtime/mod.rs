@@ -36,17 +36,17 @@ use self::rust_script_language::RustScriptLanguage;
 macro_rules! setup {
     ($lib_crate:tt) => {
         mod scripts_lib {
-            pub use ::$lib_crate::{__godot_rust_script_init, __GODOT_RUST_SCRIPT_SRC_ROOT};
+            pub use $lib_crate::{__godot_rust_script_init, __GODOT_RUST_SCRIPT_SRC_ROOT};
         }
     };
 }
 
 #[macro_export]
 macro_rules! init {
-    () => {
+    ($scripts_module:tt) => {
         $crate::RustScriptExtensionLayer::initialize(
-            scripts_lib::__godot_rust_script_init,
-            scripts_lib::__GODOT_RUST_SCRIPT_SRC_ROOT,
+            $scripts_module::__godot_rust_script_init,
+            $scripts_module::__GODOT_RUST_SCRIPT_SRC_ROOT,
         )
     };
 }

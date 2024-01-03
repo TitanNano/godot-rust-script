@@ -23,7 +23,9 @@ pub use godot_rust_script_derive::{godot_script_impl, GodotScript};
 
 pub mod private_export {
     pub use super::script_registry::RemoteVariantType;
+    pub use super::shared::__godot_rust_plugin_SCRIPT_REGISTRY;
     pub use abi_stable::std_types::{RStr, RString, RVec};
+    pub use const_str::{concat, replace, strip_prefix, unwrap};
     pub use godot::sys::{plugin_add, plugin_registry};
 }
 
