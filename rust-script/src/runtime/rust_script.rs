@@ -93,17 +93,10 @@ impl RustScript {
     fn owner_ids(&self) -> Array<i64> {
         let owners = self.owners.borrow();
 
-        godot_print!("extracting script owners: {:?}", *owners);
-
         let set: HashSet<_> = owners
             .iter()
-            .filter_map(|item| {
-                let strong_ref = item.get_ref().to::<Option<Gd<Object>>>();
-
-                godot_print!("strong ref: {:?}", strong_ref);
-
-                strong_ref.map(|obj| obj.instance_id().to_i64())
-            })
+            .filter_map(|item| item.get_ref().to::<Option<Gd<Object>>>())
+            .map(|obj| obj.instance_id().to_i64())
             .collect();
 
         set.into_iter().collect()
@@ -120,21 +113,11 @@ impl RustScript {
             godot_warn!("over writing existing owners of rust script");
         }
 
-        godot_print!("assigning owners list to script: {:?}", ids);
-
         *self.owners.borrow_mut() = ids
             .iter_shared()
             .map(InstanceId::from_i64)
             .filter_map(|id| {
-                godot_print!(
-                    "reloading script instance of {}, {}",
-                    id,
-                    self.get_class_name()
-                );
-
                 let result: Option<Gd<Object>> = Gd::try_from_instance_id(id).ok();
-
-                godot_print!("object for {} is {:?}", id, result);
                 result
             })
             .map(|gd_ref| godot::engine::utilities::weakref(gd_ref.to_variant()).to())
@@ -145,8 +128,6 @@ impl RustScript {
 #[godot_api]
 impl IScriptExtension for RustScript {
     fn init(base: Base<Self::Base>) -> Self {
-        godot_print!("creating RustScript struct for {:?}", base);
-
         Self {
             class_name: GString::new(),
             source_code: GString::new(),
@@ -203,11 +184,6 @@ impl IScriptExtension for RustScript {
     }
 
     unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
-        godot_print!(
-            "creating placeholder instance for script {}",
-            self.get_global_name()
-        );
-
         self.owners
             .borrow_mut()
             .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
@@ -347,11 +323,6 @@ impl IScriptExtension for RustScript {
 
     // godot script reload hook
     fn reload(&mut self, _keep_state: bool) -> godot::engine::global::Error {
-        godot_print!(
-            "new script properties: {:?}",
-            self.get_script_property_list()
-        );
-
         self.owners.borrow().iter().for_each(|owner| {
             let mut object: Gd<Object> = match owner.get_ref().try_to() {
                 Ok(owner) => owner,
