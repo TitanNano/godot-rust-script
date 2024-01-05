@@ -11,9 +11,9 @@ use godot::{
     builtin::meta::{MethodInfo, PropertyInfo, ToGodot},
     engine::{
         create_script_instance, notify::ObjectNotification, ClassDb, Engine, IScriptExtension,
-        Script, ScriptExtension, ScriptLanguage, WeakRef,
+        Script, ScriptExtension, ScriptInstance, ScriptLanguage, WeakRef,
     },
-    log::{godot_print, godot_warn},
+    log::{godot_error, godot_print, godot_warn},
     obj::{InstanceId, UserClass},
     prelude::{
         godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, StringName, Variant,
@@ -123,6 +123,31 @@ impl RustScript {
             .map(|gd_ref| godot::engine::utilities::weakref(gd_ref.to_variant()).to())
             .collect();
     }
+
+    fn init_script_instance(instance: &mut RustScriptInstance) {
+        match instance.call(StringName::from("_init"), &[]) {
+            Ok(_) => (),
+            Err(err) => {
+                use godot::sys::*;
+
+                if !matches!(
+                    err,
+                    GDEXTENSION_CALL_OK | GDEXTENSION_CALL_ERROR_INVALID_METHOD
+                ) {
+                    let error_code = match err {
+                        GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL => "INSTANCE_IS_NULL",
+                        GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT => "INVALID_ARGUMENT",
+                        GDEXTENSION_CALL_ERROR_METHOD_NOT_CONST => "METHOD_NOT_CONST",
+                        GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS => "TOO_FEW_ARGUMENTS",
+                        GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS => "TOO_MANY_ARGUMENTS",
+                        _ => "UNKNOWN",
+                    };
+
+                    godot_error!("failed to call rust script _init fn: {}", error_code);
+                }
+            }
+        };
+    }
 }
 
 #[godot_api]
@@ -178,8 +203,10 @@ impl IScriptExtension for RustScript {
             .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
 
         let data = self.create_remote_instance(for_object.clone());
-        let instance = RustScriptInstance::new(data, for_object, self.base.deref().clone().cast());
+        let mut instance =
+            RustScriptInstance::new(data, for_object, self.base.deref().clone().cast());
 
+        Self::init_script_instance(&mut instance);
         create_script_instance(instance)
     }
 
