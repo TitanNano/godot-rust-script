@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+mod downgrade_self;
 mod metadata;
 mod resource_loader;
 mod resource_saver;

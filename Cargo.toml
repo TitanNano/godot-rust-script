@@ -10,7 +10,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-godot = { git = "https://github.com/titannano/gdext", rev = "4ce4714" }
+godot = { git = "https://github.com/titannano/gdext", rev = "e3644a0348b4d6fe952007cebd94d1d3f5ddfd86" }
 itertools = "0.10.3"
 abi_stable = { version = "0.11.2", default-features = false }
 rand = "0.8.5"

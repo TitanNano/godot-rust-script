@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::{cell::RefCell, collections::HashSet, ffi::c_void, ops::Deref};
+use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
 use abi_stable::std_types::RBox;
 use godot::{
@@ -14,7 +14,7 @@ use godot::{
         Script, ScriptExtension, ScriptInstance, ScriptLanguage, WeakRef,
     },
     log::{godot_error, godot_print, godot_warn},
-    obj::{InstanceId, UserClass},
+    obj::{InstanceId, WithBaseField},
     prelude::{
         godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, StringName, Variant,
         VariantArray,
@@ -25,6 +25,7 @@ use RemoteGodotScript_trait::RemoteGodotScript_TO;
 use crate::{apply::Apply, script_registry::RemoteGodotScript_trait};
 
 use super::{
+    downgrade_self::DowngradeSelf,
     metadata::{Documented, ToDictionary, ToMethodDoc, ToPropertyDoc},
     rust_script_instance::{RustScriptInstance, RustScriptPlaceholder},
     rust_script_language::RustScriptLanguage,
@@ -47,6 +48,7 @@ pub(super) struct RustScript {
     owner_ids: Array<i64>,
 
     owners: RefCell<Vec<Gd<WeakRef>>>,
+    #[base]
     base: Base<ScriptExtension>,
 }
 
@@ -174,7 +176,7 @@ impl IScriptExtension for RustScript {
     }
 
     fn get_language(&self) -> Option<Gd<ScriptLanguage>> {
-        Some(RustScriptLanguage::alloc_gd().upcast())
+        RustScriptLanguage::singleton().map(Gd::upcast)
     }
 
     fn can_instantiate(&self) -> bool {
@@ -203,8 +205,7 @@ impl IScriptExtension for RustScript {
             .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
 
         let data = self.create_remote_instance(for_object.clone());
-        let mut instance =
-            RustScriptInstance::new(data, for_object, self.base.deref().clone().cast());
+        let mut instance = RustScriptInstance::new(data, for_object, self.to_gd());
 
         Self::init_script_instance(&mut instance);
         create_script_instance(instance)
@@ -215,7 +216,7 @@ impl IScriptExtension for RustScript {
             .borrow_mut()
             .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
 
-        let placeholder = RustScriptPlaceholder::new(self.base.deref().clone().cast());
+        let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
         create_script_instance(placeholder)
     }
@@ -338,7 +339,7 @@ impl IScriptExtension for RustScript {
             dict.set(GString::from("is_deprecated"), false);
             dict.set(GString::from("is_experimental"), false);
             dict.set(GString::from("is_script_doc"), true);
-            dict.set(GString::from("script_path"), self.base.get_path());
+            dict.set(GString::from("script_path"), self.base().get_path());
         });
 
         Array::from(&[class_doc])
@@ -350,7 +351,9 @@ impl IScriptExtension for RustScript {
 
     // godot script reload hook
     fn reload(&mut self, _keep_state: bool) -> godot::engine::global::Error {
-        self.owners.borrow().iter().for_each(|owner| {
+        let owners = self.owners.borrow().clone();
+
+        owners.iter().for_each(|owner| {
             let mut object: Gd<Object> = match owner.get_ref().try_to() {
                 Ok(owner) => owner,
                 Err(err) => {
@@ -359,14 +362,13 @@ impl IScriptExtension for RustScript {
                 }
             };
 
-            let script = object.get_script();
-
             // clear script to destroy script instance.
             object.set_script(Variant::nil());
 
-            // re-assign script to create new instance.
-            // call is defered because this will call back into can_instantiate.
-            object.call_deferred(StringName::from("set_script"), &[script]);
+            self.downgrade_gd(|self_gd| {
+                // re-assign script to create new instance.
+                object.set_script(self_gd.to_variant());
+            })
         });
 
         godot::engine::global::Error::OK

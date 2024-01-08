@@ -11,7 +11,6 @@ use std::{collections::HashMap, rc::Rc};
 use abi_stable::std_types::{RBox, RString};
 use godot::{
     engine::{Script, ScriptInstance},
-    obj::UserClass,
     prelude::{
         meta::{MethodInfo, PropertyInfo},
         GString, Gd, Object, StringName, Variant, VariantType,
@@ -192,7 +191,9 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn get_language(&self) -> Gd<godot::engine::ScriptLanguage> {
-        RustScriptLanguage::alloc_gd().upcast()
+        RustScriptLanguage::singleton()
+            .map(Gd::upcast)
+            .expect("RustScriptLanguage singleton is not initialized")
     }
 
     fn on_refcount_decremented(&self) -> bool {
@@ -303,7 +304,9 @@ impl ScriptInstance for RustScriptPlaceholder {
     }
 
     fn get_language(&self) -> Gd<godot::engine::ScriptLanguage> {
-        RustScriptLanguage::alloc_gd().upcast()
+        RustScriptLanguage::singleton()
+            .map(Gd::upcast)
+            .expect("RustScriptLanguage singleton is not initialized")
     }
 
     fn on_refcount_decremented(&self) -> bool {
