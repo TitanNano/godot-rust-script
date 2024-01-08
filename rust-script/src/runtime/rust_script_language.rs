@@ -7,7 +7,7 @@
 use std::ffi::OsStr;
 
 use godot::{
-    engine::{FileAccess, IScriptLanguageExtension, ProjectSettings, Script},
+    engine::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script},
     obj::Base,
     prelude::{
         godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray,
@@ -51,6 +51,12 @@ impl RustScriptLanguage {
             })
             .join("")
     }
+
+    pub fn singleton() -> Option<Gd<Self>> {
+        Engine::singleton()
+            .get_singleton(RustScriptLanguage::class_name().to_string_name())
+            .map(|gd| gd.cast())
+    }
 }
 
 #[godot_api]
@@ -90,7 +96,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     }
 
     /// frame hook will be called for each reandered frame
-    fn frame(&mut self) {}
+    /// fn frame(&mut self) {}
 
     fn handles_global_class_type(&self, type_: GString) -> bool {
         type_ == self.get_type()
