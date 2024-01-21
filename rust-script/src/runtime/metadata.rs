@@ -24,7 +24,7 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ScriptMetaData {
     class_name: ClassName,
     base_type_name: StringName,
