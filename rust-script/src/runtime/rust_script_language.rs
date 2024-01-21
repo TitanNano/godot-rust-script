@@ -18,7 +18,7 @@ use itertools::Itertools;
 
 use crate::apply::Apply;
 
-use super::rust_script::RustScript;
+use super::{metadata::ScriptMetaData, rust_script::RustScript, SCRIPT_REGISTRY};
 
 #[derive(GodotClass)]
 #[class(base = ScriptLanguageExtension, tool)]
@@ -56,6 +56,14 @@ impl RustScriptLanguage {
         Engine::singleton()
             .get_singleton(RustScriptLanguage::class_name().to_string_name())
             .map(|gd| gd.cast())
+    }
+
+    pub fn script_meta_data(class_name: &str) -> Option<ScriptMetaData> {
+        let reg = SCRIPT_REGISTRY
+            .read()
+            .expect("unable to obtain read access");
+
+        reg.get(class_name).map(ToOwned::to_owned)
     }
 }
 
@@ -141,8 +149,12 @@ impl IScriptLanguageExtension for RustScriptLanguage {
             return GString::from("rust file is not part of the scripts crate!");
         }
 
-        if !FileAccess::file_exists(path) {
+        if !FileAccess::file_exists(path.clone()) {
             return GString::from("RustScripts can not be created via the Godot editor!");
+        }
+
+        if !self.get_global_class_name(path).contains_key("name") {
+            return GString::from("Rust script has not been complied into shared library yet!");
         }
 
         GString::new()
@@ -168,7 +180,14 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     fn get_global_class_name(&self, path: GString) -> Dictionary {
         let class_name = Self::path_to_class_name(&path);
 
-        Dictionary::new().apply(|dict| dict.set("name", class_name))
+        let Some(script) = Self::script_meta_data(&class_name) else {
+            return Dictionary::new();
+        };
+
+        Dictionary::new().apply(|dict| {
+            dict.set("name", class_name);
+            dict.set("base_type", script.base_type_name());
+        })
     }
 
     fn overrides_external_editor(&mut self) -> bool {

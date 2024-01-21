@@ -182,13 +182,13 @@ impl RemoteScriptMetaData {
 }
 
 #[abi_stable::sabi_trait]
-pub trait CreateScriptInstanceData: Debug + Sync + Send {
+pub trait CreateScriptInstanceData: Debug + Sync + Send + Clone {
     fn create(&self, base: RemoteValue) -> RemoteGodotScript_TO<'static, RBox<()>>;
 }
 
 impl<F> CreateScriptInstanceData for F
 where
-    F: Fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> + Debug + Sync + Send,
+    F: Fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> + Debug + Sync + Send + Clone,
 {
     fn create(&self, base: RemoteValue) -> RemoteGodotScript_TO<'static, RBox<()>> {
         let variant: Variant = base.into();
