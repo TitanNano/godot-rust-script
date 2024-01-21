@@ -25,7 +25,7 @@ impl IResourceFormatSaver for RustScriptResourceSaver {
 
         godot_print!("saving rust script resource to: {}", path);
 
-        if flags as u64 & SaverFlags::FLAG_CHANGE_PATH.ord() > 0 {
+        if flags as u64 & SaverFlags::CHANGE_PATH.ord() > 0 {
             script.set_path(path.clone());
         }
 

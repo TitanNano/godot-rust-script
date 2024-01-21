@@ -111,11 +111,10 @@ impl From<RemoteScriptPropertyInfo> for PropertyInfo {
             variant_type: value.variant_type.into(),
             property_name: value.property_name.into(),
             class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
-            hint: PropertyHint::try_from_ord(value.hint)
-                .unwrap_or(PropertyHint::PROPERTY_HINT_NONE),
+            hint: PropertyHint::try_from_ord(value.hint).unwrap_or(PropertyHint::NONE),
             hint_string: value.hint_string.into(),
             usage: PropertyUsageFlags::try_from_ord(value.usage)
-                .unwrap_or(PropertyUsageFlags::PROPERTY_USAGE_NONE),
+                .unwrap_or(PropertyUsageFlags::NONE),
         }
     }
 }
@@ -141,8 +140,7 @@ impl From<RemoteScriptMethodInfo> for MethodInfo {
             return_type: value.return_type.into(),
             arguments: value.arguments.into_iter().map(|arg| arg.into()).collect(),
             default_arguments: vec![],
-            flags: MethodFlags::try_from_ord(value.flags)
-                .unwrap_or(MethodFlags::METHOD_FLAGS_DEFAULT),
+            flags: MethodFlags::try_from_ord(value.flags).unwrap_or(MethodFlags::DEFAULT),
         }
     }
 }
