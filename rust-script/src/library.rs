@@ -125,11 +125,9 @@ impl RustScriptPropDesc {
             class_name: RStr::from_str(class_name),
             property_name: RString::with_capacity(self.name.len()).apply(|s| s.push_str(self.name)),
             usage: if self.exported {
-                (PropertyUsageFlags::PROPERTY_USAGE_EDITOR
-                    | PropertyUsageFlags::PROPERTY_USAGE_STORAGE)
-                    .ord()
+                (PropertyUsageFlags::EDITOR | PropertyUsageFlags::STORAGE).ord()
             } else {
-                PropertyUsageFlags::PROPERTY_USAGE_NONE.ord()
+                PropertyUsageFlags::NONE.ord()
             },
             hint: self.hint.ord(),
             hint_string: self.hint_string.into(),
