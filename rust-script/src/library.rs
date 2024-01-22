@@ -22,12 +22,15 @@ pub use crate::script_registry::{
 };
 use crate::{
     apply::Apply,
-    script_registry::{RemoteGodotScript_TO, RemoteScriptPropertyInfo},
+    script_registry::{RemoteGodotScript_TO, RemoteScriptPropertyInfo, RemoteScriptSignalInfo},
 };
+pub use signals::{ScriptSignal, Signal, SignalArguments};
+
+mod signals;
 
 #[macro_export]
 macro_rules! register_script_class {
-    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr) => {
+    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr) => {
         $crate::private_export::plugin_add! {
         SCRIPT_REGISTRY in $crate::private_export;
             $crate::RegistryItem::Entry($crate::RustScriptEntry {
@@ -35,6 +38,9 @@ macro_rules! register_script_class {
                 base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_name().as_str(),
                 properties: || {
                     $props
+                },
+                signals: || {
+                    $signals
                 },
                 create_data: $crate::create_default_data_struct::<$class_name>,
                 description: $desc,
@@ -93,6 +99,7 @@ pub struct RustScriptEntry {
     pub class_name: &'static str,
     pub base_type_name: &'static str,
     pub properties: fn() -> Vec<RustScriptPropDesc>,
+    pub signals: fn() -> Vec<RustScriptSignalDesc>,
     pub create_data: fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>>,
     pub description: &'static str,
 }
@@ -162,6 +169,26 @@ impl RustScriptMethodDesc {
     }
 }
 
+pub struct RustScriptSignalDesc {
+    pub name: &'static str,
+    pub arguments: Vec<RustScriptPropDesc>,
+    pub description: &'static str,
+}
+
+impl From<RustScriptSignalDesc> for RemoteScriptSignalInfo {
+    fn from(value: RustScriptSignalDesc) -> Self {
+        Self {
+            name: value.name.into(),
+            arguments: value
+                .arguments
+                .into_iter()
+                .map(|arg| arg.into_property_info("\0"))
+                .collect(),
+            description: value.description.into(),
+        }
+    }
+}
+
 pub fn create_default_data_struct<T: GodotScript + 'static>(
     base: Gd<Object>,
 ) -> RemoteGodotScript_TO<'static, RBox<()>> {
@@ -199,6 +226,8 @@ pub fn assemble_metadata<'a>(
                 })
                 .collect();
 
+            let signals = (class.signals)().into_iter().map(Into::into).collect();
+
             let create_data = class.create_data;
             let description = class.description;
 
@@ -207,6 +236,7 @@ pub fn assemble_metadata<'a>(
                 class.base_type_name.into(),
                 props,
                 methods,
+                signals,
                 create_data,
                 description.into(),
             )

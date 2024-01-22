@@ -230,7 +230,34 @@ impl IScriptExtension for RustScript {
     }
 
     fn get_script_signal_list(&self) -> Array<Dictionary> {
-        Array::new()
+        let Some(script) = RustScriptLanguage::script_meta_data(&self.str_class_name()) else {
+            godot_error!(
+                "RustScript class {} does not exist in compiled dynamic library!",
+                self.str_class_name()
+            );
+            return Array::new();
+        };
+
+        script
+            .signals()
+            .iter()
+            .map(|signal| MethodInfo::from(signal.to_owned()).to_dict())
+            .collect()
+    }
+
+    fn has_script_signal(&self, name: StringName) -> bool {
+        let Some(script) = RustScriptLanguage::script_meta_data(&self.str_class_name()) else {
+            godot_error!(
+                "RustScript class {} does not exist in compiled dynamic library!",
+                self.str_class_name()
+            );
+            return false;
+        };
+
+        script
+            .signals()
+            .iter()
+            .any(|signal| signal.name.as_str() == name.to_string())
     }
 
     fn update_exports(&mut self) {}
@@ -293,7 +320,12 @@ impl IScriptExtension for RustScript {
     }
 
     fn get_documentation(&self) -> Array<Dictionary> {
-        let (methods, props, description): (Array<Dictionary>, Array<Dictionary>, &'static str) = {
+        let (methods, props, signals, description): (
+            Array<Dictionary>,
+            Array<Dictionary>,
+            Array<Dictionary>,
+            &'static str,
+        ) = {
             let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
 
             reg.get(&self.str_class_name())
@@ -314,9 +346,17 @@ impl IScriptExtension for RustScript {
                         })
                         .collect();
 
+                    let signals = class
+                        .signals()
+                        .iter()
+                        .map(|signal| {
+                            Documented::<MethodInfo>::from(signal.to_owned()).to_method_doc()
+                        })
+                        .collect();
+
                     let description = class.description();
 
-                    (methods, props, description)
+                    (methods, props, signals, description)
                 })
                 .unwrap_or_default()
         };
@@ -330,7 +370,7 @@ impl IScriptExtension for RustScript {
             dict.set(GString::from("constructors"), VariantArray::new());
             dict.set(GString::from("methods"), methods);
             dict.set(GString::from("operators"), VariantArray::new());
-            dict.set(GString::from("signals"), VariantArray::new());
+            dict.set(GString::from("signals"), signals);
             dict.set(GString::from("constants"), VariantArray::new());
             dict.set(GString::from("enums"), VariantArray::new());
             dict.set(GString::from("properties"), props);

@@ -12,6 +12,7 @@ use abi_stable::{
     StableAbi,
 };
 use godot::{
+    builtin::GString,
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
     obj::{EngineBitfield, EngineEnum},
     prelude::{
@@ -145,6 +146,35 @@ impl From<RemoteScriptMethodInfo> for MethodInfo {
     }
 }
 
+#[derive(Debug, StableAbi, Clone)]
+#[repr(C)]
+pub struct RemoteScriptSignalInfo {
+    pub name: RStr<'static>,
+    pub arguments: RVec<RemoteScriptPropertyInfo>,
+    pub description: RStr<'static>,
+}
+
+impl From<RemoteScriptSignalInfo> for MethodInfo {
+    fn from(value: RemoteScriptSignalInfo) -> Self {
+        Self {
+            id: 0,
+            method_name: value.name.into(),
+            class_name: ClassName::none(),
+            return_type: PropertyInfo {
+                variant_type: VariantType::Nil,
+                class_name: ClassName::none(),
+                property_name: StringName::default(),
+                hint: PropertyHint::NONE,
+                hint_string: GString::default(),
+                usage: PropertyUsageFlags::NONE,
+            },
+            arguments: value.arguments.into_iter().map(|arg| arg.into()).collect(),
+            default_arguments: vec![],
+            flags: MethodFlags::NORMAL,
+        }
+    }
+}
+
 #[derive(Debug, StableAbi)]
 #[repr(C)]
 pub struct RemoteScriptMetaData {
@@ -152,6 +182,7 @@ pub struct RemoteScriptMetaData {
     pub(crate) base_type_name: RStr<'static>,
     pub(crate) properties: RVec<RemoteScriptPropertyInfo>,
     pub(crate) methods: RVec<RemoteScriptMethodInfo>,
+    pub(crate) signals: RVec<RemoteScriptSignalInfo>,
     pub(crate) create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
     pub(crate) description: RStr<'static>,
 }
@@ -162,6 +193,7 @@ impl RemoteScriptMetaData {
         base_type_name: RStr<'static>,
         properties: RVec<RemoteScriptPropertyInfo>,
         methods: RVec<RemoteScriptMethodInfo>,
+        signals: RVec<RemoteScriptSignalInfo>,
         create_data: CD,
         description: RStr<'static>,
     ) -> Self
@@ -173,6 +205,7 @@ impl RemoteScriptMetaData {
             base_type_name,
             properties,
             methods,
+            signals,
             create_data: CreateScriptInstanceData_TO::from_value(create_data, TD_CanDowncast),
             description,
         }

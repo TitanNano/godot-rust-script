@@ -252,7 +252,7 @@ enum ExpEasingOpts {
 }
 
 #[derive(FromField, Debug)]
-#[darling(forward_attrs(export, prop, doc))]
+#[darling(forward_attrs(export, prop, doc, signal))]
 pub struct FieldOpts {
     pub ident: Option<syn::Ident>,
     pub attrs: Vec<syn::Attribute>,
