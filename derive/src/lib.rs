@@ -17,7 +17,7 @@ use type_paths::{godot_types, string_name_ty, variant_ty};
 
 use crate::attribute_ops::{FieldExportOps, PropertyOpts};
 
-#[proc_macro_derive(GodotScript, attributes(export, script, prop))]
+#[proc_macro_derive(GodotScript, attributes(export, script, prop, signal))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -41,8 +41,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             || field.attrs.iter().any(|attr| attr.path().is_ident("prop"))
     });
 
+    let signal_fields = fields.iter().filter(|field| {
+        field.attrs.iter().any(|attr| attr.path().is_ident("signal"))
+    });
+
     let field_metadata_result: Result<TokenStream, TokenStream> = public_fields
         .clone()
+        .filter(|field| !field.attrs.iter().any(|attr| attr.path().is_ident("signal")))
         .map(|field| {
             let name = field
                 .ident
@@ -64,23 +69,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 ops.hint(field.ident.span())?
             };
 
-            let description = field
-                .attrs
-                .iter()
-                .filter(|attr| attr.path().is_ident("doc"))
-                .map(|attr| {
-                    attr.meta
-                        .require_name_value()
-                        .unwrap()
-                        .value
-                        .to_token_stream()
-                })
-                .reduce(|mut acc, comment| {
-                    acc.extend(quote!(, "\n", ));
-                    acc.extend(comment);
-                    acc
-                });
-
+            let description = get_field_description(field);
             let item = quote! {
                 ::godot_rust_script::RustScriptPropDesc {
                     name: #name,
@@ -101,7 +90,21 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         Err(err) => return err.into(),
     };
 
-    let get_fields_impl = derive_get_fields(public_fields.clone());
+    let signal_metadata_result: TokenStream = signal_fields.clone().map(|field| {
+        let signal_name = field.ident.as_ref().map(|ident| ident.to_string()).unwrap_or_default();
+        let signal_description = get_field_description(field);
+        let signal_type = &field.ty;
+
+        quote! {
+            ::godot_rust_script::RustScriptSignalDesc {
+                name: #signal_name,
+                arguments: <#signal_type as ::godot_rust_script::ScriptSignal>::argument_desc(),
+                description: concat!(#signal_description),
+            },
+        }
+    }).collect();
+
+    let get_fields_impl = derive_get_fields(public_fields.clone().chain(signal_fields));
     let set_fields_impl = derive_set_fields(public_fields.clone());
     let properties_state_impl = derive_property_states_export(public_fields);
     let default_impl = derive_default_with_base(&fields);
@@ -122,7 +125,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             acc.extend(lit);
             acc
         });
-
+    
     let output = quote! {
         impl ::godot_rust_script::GodotScript for #script_type_ident {
             #get_fields_impl
@@ -148,6 +151,9 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             concat!(#description),
             vec![
                 #field_metadata
+            ],
+            vec![
+                #signal_metadata_result
             ]
         );
 
@@ -205,8 +211,13 @@ fn derive_default_with_base(field_opts: &[FieldOpts]) -> TokenStream {
         .iter()
         .filter_map(|field| match field.ident.as_ref() {
             Some(ident) if *ident == "base" => {
-                Some(quote_spanned!(ident.span() => #ident: base.cast(),))
+                Some(quote_spanned!(ident.span() => #ident: base.clone().cast(),))
+            },
+
+            Some(ident) if field.attrs.iter().any(|attr| attr.path().is_ident("signal")) => {
+                Some(quote_spanned!(ident.span() => #ident: ::godot_rust_script::ScriptSignal::new(base.clone(), stringify!(#ident)),))
             }
+            
             Some(ident) => Some(quote_spanned!(ident.span() => #ident: Default::default(),)),
             None => None,
         })
@@ -333,6 +344,25 @@ fn derive_property_states_export<'a>(
             ])
         }
     }
+}
+
+fn get_field_description(field: &FieldOpts) -> Option<TokenStream> {
+    field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .map(|attr| {
+            attr.meta
+                .require_name_value()
+                .unwrap()
+                .value
+                .to_token_stream()
+        })
+        .reduce(|mut acc, comment| {
+            acc.extend(quote!(, "\n", ));
+            acc.extend(comment);
+            acc
+        })
 }
 
 #[proc_macro_attribute]

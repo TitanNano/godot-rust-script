@@ -20,7 +20,7 @@ use crate::{
     apply::Apply,
     script_registry::{
         CreateScriptInstanceData_TO, RemoteGodotScript_TO, RemoteScriptMetaData,
-        RemoteScriptMethodInfo, RemoteScriptPropertyInfo,
+        RemoteScriptMethodInfo, RemoteScriptPropertyInfo, RemoteScriptSignalInfo,
     },
 };
 
@@ -30,6 +30,7 @@ pub struct ScriptMetaData {
     base_type_name: StringName,
     properties: Vec<RemoteScriptPropertyInfo>,
     methods: Vec<RemoteScriptMethodInfo>,
+    signals: Vec<RemoteScriptSignalInfo>,
     create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
     description: &'static str,
 }
@@ -55,6 +56,10 @@ impl ScriptMetaData {
         &self.methods
     }
 
+    pub fn signals(&self) -> &[RemoteScriptSignalInfo] {
+        &self.signals
+    }
+
     pub fn description(&self) -> &'static str {
         self.description
     }
@@ -67,6 +72,7 @@ impl From<RemoteScriptMetaData> for ScriptMetaData {
             base_type_name: StringName::from(&value.base_type_name.as_str()),
             properties: value.properties.to_vec(),
             methods: value.methods.to_vec(),
+            signals: value.signals.to_vec(),
             create_data: value.create_data,
             description: value.description.as_str(),
         }
@@ -202,6 +208,15 @@ impl From<crate::script_registry::RemoteScriptPropertyInfo> for Documented<Prope
 
 impl From<crate::script_registry::RemoteScriptMethodInfo> for Documented<MethodInfo> {
     fn from(value: crate::script_registry::RemoteScriptMethodInfo) -> Self {
+        Self {
+            description: value.description.as_str(),
+            inner: value.into(),
+        }
+    }
+}
+
+impl From<crate::script_registry::RemoteScriptSignalInfo> for Documented<MethodInfo> {
+    fn from(value: crate::script_registry::RemoteScriptSignalInfo) -> Self {
         Self {
             description: value.description.as_str(),
             inner: value.into(),
