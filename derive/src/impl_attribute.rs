@@ -74,7 +74,7 @@ pub fn godot_script_impl(
                             #godot_types::prelude::FromGodot::try_from_variant(
                                 args.get(#index).ok_or(#godot_types::sys::GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS)?
                             ).map_err(|err| {
-                                #godot_types::log::godot_error!("failed to convert variant: {}", err);
+                                #godot_types::log::godot_error!("failed to convert variant for argument {} of {}: {}", stringify!(#arg_name), #fn_name_str,  err);
                                 #godot_types::sys::GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT
                             })?
                         }
