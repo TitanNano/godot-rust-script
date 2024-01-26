@@ -12,7 +12,6 @@ edition = "2021"
 [workspace.dependencies]
 godot = { git = "https://github.com/titannano/gdext", rev = "7fd1be904efccd71a9eb980c2e6fffa2d8705ec4" }
 itertools = "0.10.3"
-abi_stable = { version = "0.11.2", default-features = false }
 rand = "0.8.5"
 darling = { version = "0.20.3" }
 proc-macro2 = "1.0.68"

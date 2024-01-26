@@ -4,11 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-#[cfg(all(feature = "hot-reload", debug_assertions))]
-use std::cell::RefCell;
 use std::{collections::HashMap, rc::Rc};
 
-use abi_stable::std_types::{RBox, RString};
 use godot::{
     engine::{Script, ScriptInstance},
     prelude::{
@@ -17,14 +14,11 @@ use godot::{
     },
 };
 
-use crate::{
-    apply::Apply,
-    script_registry::{RemoteGodotScript_TO, RemoteValueRef},
-};
+use crate::script_registry::GodotScriptObject;
 
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
 
-fn script_method_list(script: &Gd<RustScript>) -> Rc<Vec<MethodInfo>> {
+fn script_method_list(script: &Gd<RustScript>) -> Rc<[MethodInfo]> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
@@ -32,15 +26,8 @@ fn script_method_list(script: &Gd<RustScript>) -> Rc<Vec<MethodInfo>> {
         .read()
         .expect("script registry is inaccessible")
         .get(&class_name)
-        .map(|meta| {
-            Rc::new(
-                meta.methods()
-                    .iter()
-                    .map(|method| MethodInfo::from(method.to_owned()))
-                    .collect(),
-            )
-        })
-        .unwrap_or_default();
+        .map(|meta| meta.methods().iter().map(MethodInfo::from).collect())
+        .unwrap_or_else(|| Rc::new([]) as Rc<[MethodInfo]>);
 
     methods
 }
@@ -49,7 +36,7 @@ fn script_class_name(script: &Gd<RustScript>) -> GString {
     script.bind().get_class_name()
 }
 
-fn script_property_list(script: &Gd<RustScript>) -> Rc<Vec<PropertyInfo>> {
+fn script_property_list(script: &Gd<RustScript>) -> Rc<[PropertyInfo]> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
@@ -57,31 +44,24 @@ fn script_property_list(script: &Gd<RustScript>) -> Rc<Vec<PropertyInfo>> {
         .read()
         .expect("script registry is inaccessible")
         .get(&class_name)
-        .map(|meta| {
-            Rc::new(
-                meta.properties()
-                    .iter()
-                    .map(|prop| PropertyInfo::from(prop.to_owned()))
-                    .collect(),
-            )
-        })
-        .unwrap_or_default();
+        .map(|meta| meta.properties().iter().map(PropertyInfo::from).collect())
+        .unwrap_or_else(|| Rc::new([]) as Rc<[PropertyInfo]>);
 
     props
 }
 
 pub(super) struct RustScriptInstance {
-    data: RemoteGodotScript_TO<'static, RBox<()>>,
+    data: Box<dyn GodotScriptObject>,
 
     script: Gd<RustScript>,
     generic_script: Gd<Script>,
-    property_list: Rc<Vec<PropertyInfo>>,
-    method_list: Rc<Vec<MethodInfo>>,
+    property_list: Rc<[PropertyInfo]>,
+    method_list: Rc<[MethodInfo]>,
 }
 
 impl RustScriptInstance {
     pub fn new(
-        data: RemoteGodotScript_TO<'static, RBox<()>>,
+        data: Box<dyn GodotScriptObject>,
         _gd_object: Gd<Object>,
         script: Gd<RustScript>,
     ) -> Self {
@@ -95,38 +75,17 @@ impl RustScriptInstance {
     }
 }
 
-impl RustScriptInstance {
-    fn with_data<T>(&self, cb: impl FnOnce(&RemoteGodotScript_TO<'static, RBox<()>>) -> T) -> T {
-        cb(&self.data)
-    }
-
-    fn with_data_mut<T>(
-        &mut self,
-        cb: impl FnOnce(&mut RemoteGodotScript_TO<'static, RBox<()>>) -> T,
-    ) -> T {
-        cb(&mut self.data)
-    }
-}
-
 impl ScriptInstance for RustScriptInstance {
     fn class_name(&self) -> GString {
         script_class_name(&self.script)
     }
 
     fn set(&mut self, name: StringName, value: &Variant) -> bool {
-        let name = RString::with_capacity(name.len()).apply(|s| s.push_str(&name.to_string()));
-        let value = RemoteValueRef::new(value);
-
-        self.with_data_mut(|data| data.set(name, value))
+        self.data.set(name, value.to_owned())
     }
 
     fn get(&self, name: StringName) -> Option<Variant> {
-        let name =
-            RString::with_capacity(name.to_string().len()).apply(|s| s.push_str(&name.to_string()));
-
-        self.with_data(move |data| data.get(name))
-            .map(Into::into)
-            .into()
+        self.data.get(name)
     }
 
     fn get_property_list(&self) -> &[PropertyInfo] {
@@ -142,13 +101,9 @@ impl ScriptInstance for RustScriptInstance {
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        let method =
-            RString::with_capacity(method.len()).apply(|s| s.push_str(&method.to_string()));
-        let rargs = args.iter().map(|v| RemoteValueRef::new(v)).collect();
-
-        self.with_data_mut(move |data| data.call(method, rargs))
+        self.data
+            .call(method, args)
             .map(Into::into)
-            .into_result()
             // GDExtensionCallErrorType is not guaranteed to be a u32
             .map_err(|err: u32| err as godot::sys::GDExtensionCallErrorType)
     }
@@ -176,7 +131,7 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn to_string(&self) -> GString {
-        self.with_data(|data| data.to_string()).into_string().into()
+        self.data.to_string().into()
     }
 
     fn get_property_state(&self) -> Vec<(StringName, Variant)> {
@@ -215,8 +170,8 @@ pub(super) struct RustScriptPlaceholder {
     script: Gd<RustScript>,
     generic_script: Gd<Script>,
     properties: HashMap<StringName, Variant>,
-    property_list: Rc<Vec<PropertyInfo>>,
-    method_list: Rc<Vec<MethodInfo>>,
+    property_list: Rc<[PropertyInfo]>,
+    method_list: Rc<[MethodInfo]>,
 }
 
 impl RustScriptPlaceholder {

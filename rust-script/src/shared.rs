@@ -4,12 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use abi_stable::std_types::RVec;
+use crate::{script_registry::RustScriptMetaData, RegistryItem};
 
-use crate::{script_registry::RemoteScriptMetaData, RegistryItem};
+pub trait RustScriptLibInit: Fn() -> Vec<RustScriptMetaData> {}
 
-pub trait RustScriptLibInit: Fn() -> RVec<RemoteScriptMetaData> {}
-
-impl<F> RustScriptLibInit for F where F: Fn() -> RVec<RemoteScriptMetaData> {}
+impl<F> RustScriptLibInit for F where F: Fn() -> Vec<RustScriptMetaData> {}
 
 godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);

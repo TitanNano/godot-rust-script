@@ -7,7 +7,6 @@ edition.workspace = true
 
 [dependencies]
 godot.workspace = true
-abi_stable.workspace = true
 
 itertools = { workspace = true, optional = true }
 rand = { workspace = true, optional = true }

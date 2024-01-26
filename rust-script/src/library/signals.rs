@@ -28,7 +28,7 @@ pub trait ScriptSignal {
 
     fn connect(&mut self, callable: Callable) -> Result<(), Error>;
 
-    fn argument_desc() -> Vec<RustScriptPropDesc>;
+    fn argument_desc() -> Box<[RustScriptPropDesc]>;
 
     fn name(&self) -> &str;
 }
@@ -38,7 +38,7 @@ pub trait SignalArguments {
 
     fn to_variants(&self) -> Vec<Variant>;
 
-    fn argument_desc() -> Vec<RustScriptPropDesc>;
+    fn argument_desc() -> Box<[RustScriptPropDesc]>;
 }
 
 impl SignalArguments for () {
@@ -50,8 +50,8 @@ impl SignalArguments for () {
         vec![]
     }
 
-    fn argument_desc() -> Vec<RustScriptPropDesc> {
-        vec![]
+    fn argument_desc() -> Box<[RustScriptPropDesc]> {
+        Box::new([])
     }
 }
 
@@ -76,10 +76,10 @@ macro_rules! tuple_args {
                 ]
             }
 
-            fn argument_desc() -> Vec<RustScriptPropDesc> {
-                vec![
+            fn argument_desc() -> Box<[RustScriptPropDesc]> {
+                Box::new([
                     $(signal_argument_desc!("0", $arg)),+
-                ]
+                ])
             }
         }
     };
@@ -109,10 +109,10 @@ macro_rules! single_args {
                 vec![self.to_variant()]
             }
 
-            fn argument_desc() -> Vec<RustScriptPropDesc> {
-                vec![
+            fn argument_desc() -> Box<[RustScriptPropDesc]> {
+                Box::new([
                     signal_argument_desc!("0", $arg),
-                ]
+                ])
             }
         }
     };
@@ -172,7 +172,7 @@ impl<T: SignalArguments> ScriptSignal for Signal<T> {
         }
     }
 
-    fn argument_desc() -> Vec<RustScriptPropDesc> {
+    fn argument_desc() -> Box<[RustScriptPropDesc]> {
         <T as SignalArguments>::argument_desc()
     }
 
