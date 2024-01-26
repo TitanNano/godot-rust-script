@@ -40,7 +40,7 @@ impl FieldExportOps {
         if self.color_no_alpha {
             result = Some((
                 "color_no_alpha",
-                quote!(#property_hints::PROPERTY_HINT_COLOR_NO_ALPHA),
+                quote!(#property_hints::COLOR_NO_ALPHA),
                 String::new(),
             ));
         }
@@ -52,11 +52,7 @@ impl FieldExportOps {
                 return Self::error(span, active_field, field);
             }
 
-            result = Some((
-                field,
-                quote!(#property_hints::PROPERTY_HINT_DIR),
-                String::new(),
-            ));
+            result = Some((field, quote!(#property_hints::DIR), String::new()));
         }
 
         if let Some(exp_list) = self.exp_easing.as_ref() {
@@ -83,7 +79,7 @@ impl FieldExportOps {
 
             result = Some((
                 field,
-                quote!(#property_hints::PROPERTY_HINT_EXP_EASING),
+                quote!(#property_hints::EXP_EASING),
                 serialized_params.join(","),
             ));
         }
@@ -102,11 +98,7 @@ impl FieldExportOps {
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| err.write_errors())?;
 
-            result = Some((
-                field,
-                quote!(#property_hints::PROPERTY_HINT_FILE),
-                filters.join(","),
-            ));
+            result = Some((field, quote!(#property_hints::FILE), filters.join(",")));
         }
 
         if self.flags.is_some() {
@@ -116,11 +108,7 @@ impl FieldExportOps {
                 return Self::error(span, active_field, field);
             }
 
-            result = Some((
-                field,
-                quote!(#property_hints::PROPERTY_HINT_FLAGS),
-                String::new(),
-            ));
+            result = Some((field, quote!(#property_hints::FLAGS), String::new()));
         }
 
         if self.global_dir {
@@ -130,11 +118,7 @@ impl FieldExportOps {
                 return Self::error(span, active_field, field);
             }
 
-            result = Some((
-                field,
-                quote!(#property_hints::PROPERTY_HINT_GLOBAL_DIR),
-                String::new(),
-            ));
+            result = Some((field, quote!(#property_hints::GLOBAL_DIR), String::new()));
         }
 
         if self.global_file {
@@ -144,11 +128,7 @@ impl FieldExportOps {
                 return Self::error(span, active_field, field);
             }
 
-            result = Some((
-                field,
-                quote!(#property_hints::PROPERTY_HINT_GLOBAL_FILE),
-                String::new(),
-            ));
+            result = Some((field, quote!(#property_hints::GLOBAL_FILE), String::new()));
         }
 
         if self.multiline {
@@ -158,11 +138,7 @@ impl FieldExportOps {
                 return Self::error(span, active_field, field);
             }
 
-            result = Some((
-                field,
-                quote!(#property_hints::PROPERTY_HINT_MULTILINE),
-                String::new(),
-            ));
+            result = Some((field, quote!(#property_hints::MULTILINE), String::new()));
         }
 
         if let Some(list) = self.node_path.as_ref() {
@@ -181,7 +157,7 @@ impl FieldExportOps {
 
             result = Some((
                 field,
-                quote!(#property_hints::PROPERTY_HINT_NODE_PATH_VALID_TYPES),
+                quote!(#property_hints::NODE_PATH_VALID_TYPES),
                 types.join(","),
             ));
         }
@@ -195,7 +171,7 @@ impl FieldExportOps {
 
             result = Some((
                 field,
-                quote!(#property_hints::PROPERTY_HINT_PLACEHOLDER_TEXT),
+                quote!(#property_hints::PLACEHOLDER_TEXT),
                 text.to_owned(),
             ));
         }
@@ -211,14 +187,14 @@ impl FieldExportOps {
 
             result = Some((
                 field,
-                quote!(#property_hints::PROPERTY_HINT_RANGE),
+                quote!(#property_hints::RANGE),
                 format!("{},{},{}", ops.min, ops.max, step),
             ));
         }
 
         let result = result
             .map(|(_, tokens, hint_string)| (tokens, hint_string))
-            .unwrap_or_else(|| (quote!(#property_hints::PROPERTY_HINT_NONE), String::new()));
+            .unwrap_or_else(|| (quote!(#property_hints::NONE), String::new()));
 
         Ok(result)
     }

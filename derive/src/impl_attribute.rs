@@ -63,7 +63,7 @@ pub fn godot_script_impl(
                                 name: stringify!(#arg_name),
                                 ty: #arg_type,
                                 exported: false,
-                                hint: #property_hints::PROPERTY_HINT_NONE,
+                                hint: #property_hints::NONE,
                                 hint_string: "",
                                 description: "",
                             },
@@ -99,9 +99,9 @@ pub fn godot_script_impl(
             };
 
             let method_flag = if is_static {
-                quote!(#godot_types::engine::global::MethodFlags::METHOD_FLAG_STATIC)
+                quote!(#godot_types::engine::global::MethodFlags::STATIC)
             } else {
-                quote!(#godot_types::engine::global::MethodFlags::METHOD_FLAG_NORMAL)
+                quote!(#godot_types::engine::global::MethodFlags::NORMAL)
             };
 
             let description = fnc.attrs.iter()
@@ -122,7 +122,7 @@ pub fn godot_script_impl(
                         name: #fn_name_str,
                         ty: #fn_return_ty,
                         exported: false,
-                        hint: #property_hints::PROPERTY_HINT_NONE,
+                        hint: #property_hints::NONE,
                         hint_string: "",
                         description: "",
                     },
