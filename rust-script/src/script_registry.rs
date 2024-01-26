@@ -4,13 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::{collections::HashMap, fmt::Debug, marker::PhantomData};
+use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
-use abi_stable::{
-    sabi_trait::TD_CanDowncast,
-    std_types::{RBox, RHashMap, ROption, RResult, RStr, RString, RVec},
-    StableAbi,
-};
 use godot::{
     builtin::GString,
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
@@ -21,55 +16,6 @@ use godot::{
     },
     sys::VariantType,
 };
-
-#[abi_stable::sabi_trait]
-pub trait RemoteGodotScript {
-    fn set(&mut self, name: RString, value: RemoteValueRef) -> bool;
-    fn get(&self, name: RString) -> ROption<RemoteValue>;
-    fn call(&mut self, method: RString, args: RVec<RemoteValueRef>) -> RResult<RemoteValue, u32>;
-    fn to_string(&self) -> RString;
-    fn property_state(&self) -> RHashMap<RString, RemoteValue>;
-}
-
-impl<T> RemoteGodotScript for T
-where
-    T: GodotScript,
-{
-    fn set(&mut self, name: RString, value: RemoteValueRef) -> bool {
-        self.set(StringName::from(name.as_str()), value.as_ref().to())
-    }
-
-    fn get(&self, name: RString) -> ROption<RemoteValue> {
-        let result = self.get(StringName::from(name.as_str()));
-
-        match result {
-            Some(v) => ROption::RSome(RemoteValue::from(v)),
-            None => ROption::RNone,
-        }
-    }
-
-    fn call(&mut self, method: RString, args: RVec<RemoteValueRef>) -> RResult<RemoteValue, u32> where
-    {
-        let args: Vec<_> = args.into_iter().map(|vref| vref.as_ref()).collect();
-
-        self.call(method.as_str().into(), &args)
-            .map(RemoteValue::from)
-            // GDExtensionCallErrorType is not guaranteed to be a u32
-            .map_err(godot_call_error_type_to_u32)
-            .into()
-    }
-
-    fn to_string(&self) -> RString {
-        self.to_string().into()
-    }
-
-    fn property_state(&self) -> RHashMap<RString, RemoteValue> {
-        self.property_state()
-            .into_iter()
-            .map(|(key, value)| (key.to_string().into(), value.into()))
-            .collect()
-    }
-}
 
 pub trait GodotScript: Debug + GodotScriptImpl {
     fn set(&mut self, name: StringName, value: Variant) -> bool;
@@ -94,24 +40,62 @@ pub trait GodotScriptImpl {
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
 }
 
-#[derive(Debug, StableAbi, Clone)]
-#[repr(C)]
-pub struct RemoteScriptPropertyInfo {
-    pub variant_type: RemoteVariantType,
-    pub property_name: RString,
-    pub class_name: RStr<'static>,
-    pub hint: i32,
-    pub hint_string: RStr<'static>,
-    pub usage: u64,
-    pub description: RStr<'static>,
+pub trait GodotScriptObject {
+    fn set(&mut self, name: StringName, value: Variant) -> bool;
+    fn get(&self, name: StringName) -> Option<Variant>;
+    fn call(
+        &mut self,
+        method: StringName,
+        args: &[&Variant],
+    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
+    fn to_string(&self) -> String;
+    fn property_state(&self) -> HashMap<StringName, Variant>;
 }
 
-impl From<RemoteScriptPropertyInfo> for PropertyInfo {
-    fn from(value: RemoteScriptPropertyInfo) -> Self {
+impl<T: GodotScript> GodotScriptObject for T {
+    fn set(&mut self, name: StringName, value: Variant) -> bool {
+        GodotScript::set(self, name, value)
+    }
+
+    fn get(&self, name: StringName) -> Option<Variant> {
+        GodotScript::get(self, name)
+    }
+
+    fn call(
+        &mut self,
+        method: StringName,
+        args: &[&Variant],
+    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
+        GodotScript::call(self, method, args)
+    }
+
+    fn to_string(&self) -> String {
+        GodotScript::to_string(self)
+    }
+
+    fn property_state(&self) -> HashMap<StringName, Variant> {
+        GodotScript::property_state(self)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[repr(C)]
+pub struct RustScriptPropertyInfo {
+    pub variant_type: VariantType,
+    pub property_name: &'static str,
+    pub class_name: &'static str,
+    pub hint: i32,
+    pub hint_string: &'static str,
+    pub usage: u64,
+    pub description: &'static str,
+}
+
+impl From<&RustScriptPropertyInfo> for PropertyInfo {
+    fn from(value: &RustScriptPropertyInfo) -> Self {
         Self {
-            variant_type: value.variant_type.into(),
+            variant_type: value.variant_type,
             property_name: value.property_name.into(),
-            class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
+            class_name: ClassName::from_ascii_cstr(value.class_name.as_bytes()),
             hint: PropertyHint::try_from_ord(value.hint).unwrap_or(PropertyHint::NONE),
             hint_string: value.hint_string.into(),
             usage: PropertyUsageFlags::try_from_ord(value.usage)
@@ -120,42 +104,41 @@ impl From<RemoteScriptPropertyInfo> for PropertyInfo {
     }
 }
 
-#[derive(Debug, StableAbi, Clone)]
+#[derive(Debug, Clone)]
 #[repr(C)]
-pub struct RemoteScriptMethodInfo {
+pub struct RustScriptMethodInfo {
     pub id: i32,
-    pub method_name: RStr<'static>,
-    pub class_name: RStr<'static>,
-    pub return_type: RemoteScriptPropertyInfo,
-    pub arguments: RVec<RemoteScriptPropertyInfo>,
+    pub method_name: &'static str,
+    pub class_name: &'static str,
+    pub return_type: RustScriptPropertyInfo,
+    pub arguments: Box<[RustScriptPropertyInfo]>,
     pub flags: u64,
-    pub description: RStr<'static>,
+    pub description: &'static str,
 }
 
-impl From<RemoteScriptMethodInfo> for MethodInfo {
-    fn from(value: RemoteScriptMethodInfo) -> Self {
+impl From<&RustScriptMethodInfo> for MethodInfo {
+    fn from(value: &RustScriptMethodInfo) -> Self {
         Self {
             id: value.id,
             method_name: value.method_name.into(),
-            class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
-            return_type: value.return_type.into(),
-            arguments: value.arguments.into_iter().map(|arg| arg.into()).collect(),
+            class_name: ClassName::from_ascii_cstr(value.class_name.as_bytes()),
+            return_type: (&value.return_type).into(),
+            arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
             default_arguments: vec![],
             flags: MethodFlags::try_from_ord(value.flags).unwrap_or(MethodFlags::DEFAULT),
         }
     }
 }
 
-#[derive(Debug, StableAbi, Clone)]
-#[repr(C)]
-pub struct RemoteScriptSignalInfo {
-    pub name: RStr<'static>,
-    pub arguments: RVec<RemoteScriptPropertyInfo>,
-    pub description: RStr<'static>,
+#[derive(Debug, Clone)]
+pub struct RustScriptSignalInfo {
+    pub name: &'static str,
+    pub arguments: Box<[RustScriptPropertyInfo]>,
+    pub description: &'static str,
 }
 
-impl From<RemoteScriptSignalInfo> for MethodInfo {
-    fn from(value: RemoteScriptSignalInfo) -> Self {
+impl From<&RustScriptSignalInfo> for MethodInfo {
+    fn from(value: &RustScriptSignalInfo) -> Self {
         Self {
             id: 0,
             method_name: value.name.into(),
@@ -168,255 +151,85 @@ impl From<RemoteScriptSignalInfo> for MethodInfo {
                 hint_string: GString::default(),
                 usage: PropertyUsageFlags::NONE,
             },
-            arguments: value.arguments.into_iter().map(|arg| arg.into()).collect(),
+            arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
             default_arguments: vec![],
             flags: MethodFlags::NORMAL,
         }
     }
 }
 
-#[derive(Debug, StableAbi)]
-#[repr(C)]
-pub struct RemoteScriptMetaData {
-    pub(crate) class_name: RStr<'static>,
-    pub(crate) base_type_name: RStr<'static>,
-    pub(crate) properties: RVec<RemoteScriptPropertyInfo>,
-    pub(crate) methods: RVec<RemoteScriptMethodInfo>,
-    pub(crate) signals: RVec<RemoteScriptSignalInfo>,
-    pub(crate) create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
-    pub(crate) description: RStr<'static>,
+#[derive(Debug, Clone)]
+pub struct RustScriptMetaData {
+    pub(crate) class_name: ClassName,
+    pub(crate) base_type_name: StringName,
+    pub(crate) properties: Box<[RustScriptPropertyInfo]>,
+    pub(crate) methods: Box<[RustScriptMethodInfo]>,
+    pub(crate) signals: Box<[RustScriptSignalInfo]>,
+    pub(crate) create_data: Arc<dyn CreateScriptInstanceData>,
+    pub(crate) description: &'static str,
 }
 
-impl RemoteScriptMetaData {
-    pub fn new<CD>(
-        class_name: RStr<'static>,
-        base_type_name: RStr<'static>,
-        properties: RVec<RemoteScriptPropertyInfo>,
-        methods: RVec<RemoteScriptMethodInfo>,
-        signals: RVec<RemoteScriptSignalInfo>,
-        create_data: CD,
-        description: RStr<'static>,
-    ) -> Self
-    where
-        CD: CreateScriptInstanceData + 'static,
-    {
+impl RustScriptMetaData {
+    pub fn new(
+        class_name: &'static str,
+        base_type_name: StringName,
+        properties: Box<[RustScriptPropertyInfo]>,
+        methods: Box<[RustScriptMethodInfo]>,
+        signals: Box<[RustScriptSignalInfo]>,
+        create_data: Box<dyn CreateScriptInstanceData>,
+        description: &'static str,
+    ) -> Self {
         Self {
-            class_name,
+            class_name: ClassName::from_ascii_cstr(class_name.as_bytes()),
             base_type_name,
             properties,
             methods,
             signals,
-            create_data: CreateScriptInstanceData_TO::from_value(create_data, TD_CanDowncast),
+            create_data: Arc::from(create_data),
             description,
         }
     }
 }
 
-#[abi_stable::sabi_trait]
-pub trait CreateScriptInstanceData: Debug + Sync + Send + Clone {
-    fn create(&self, base: RemoteValue) -> RemoteGodotScript_TO<'static, RBox<()>>;
+impl RustScriptMetaData {
+    pub fn class_name(&self) -> ClassName {
+        self.class_name
+    }
+
+    pub fn base_type_name(&self) -> StringName {
+        self.base_type_name.clone()
+    }
+
+    pub fn create_data(&self, base: Gd<Object>) -> Box<dyn GodotScriptObject> {
+        self.create_data.create(base)
+    }
+
+    pub fn properties(&self) -> &[RustScriptPropertyInfo] {
+        &self.properties
+    }
+
+    pub fn methods(&self) -> &[RustScriptMethodInfo] {
+        &self.methods
+    }
+
+    pub fn signals(&self) -> &[RustScriptSignalInfo] {
+        &self.signals
+    }
+
+    pub fn description(&self) -> &'static str {
+        self.description
+    }
+}
+
+pub trait CreateScriptInstanceData: Sync + Send + Debug {
+    fn create(&self, base: Gd<Object>) -> Box<dyn GodotScriptObject>;
 }
 
 impl<F> CreateScriptInstanceData for F
 where
-    F: Fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> + Debug + Sync + Send + Clone,
+    F: (Fn(Gd<Object>) -> Box<dyn GodotScriptObject>) + Send + Sync + Debug,
 {
-    fn create(&self, base: RemoteValue) -> RemoteGodotScript_TO<'static, RBox<()>> {
-        let variant: Variant = base.into();
-
-        self(variant.to())
+    fn create(&self, base: Gd<Object>) -> Box<dyn GodotScriptObject> {
+        self(base)
     }
-}
-
-#[derive(Debug, StableAbi, Clone, Copy)]
-#[repr(usize)]
-pub enum RemoteVariantType {
-    Nil,
-    Bool,
-    Int,
-    Float,
-    String,
-    Vector2,
-    Vector2i,
-    Rect2,
-    Rect2i,
-    Vector3,
-    Vector3i,
-    Transform2D,
-    Vector4,
-    Vector4i,
-    Plane,
-    Quaternion,
-    Aabb,
-    Basis,
-    Transform3D,
-    Projection,
-    Color,
-    StringName,
-    NodePath,
-    Rid,
-    Object,
-    Callable,
-    Signal,
-    Dictionary,
-    Array,
-    PackedByteArray,
-    PackedInt32Array,
-    PackedInt64Array,
-    PackedFloat32Array,
-    PackedFloat64Array,
-    PackedStringArray,
-    PackedVector2Array,
-    PackedVector3Array,
-    PackedColorArray,
-}
-
-impl From<RemoteVariantType> for VariantType {
-    fn from(value: RemoteVariantType) -> Self {
-        use RemoteVariantType as V;
-
-        match value {
-            V::Nil => Self::Nil,
-            V::Bool => Self::Bool,
-            V::Int => Self::Int,
-            V::Float => Self::Float,
-            V::String => Self::String,
-            V::Vector2 => Self::Vector2,
-            V::Vector2i => Self::Vector2i,
-            V::Rect2 => Self::Rect2,
-            V::Rect2i => Self::Vector2i,
-            V::Vector3 => Self::Vector3,
-            V::Vector3i => Self::Vector3i,
-            V::Transform2D => Self::Transform2D,
-            V::Vector4 => Self::Vector4,
-            V::Vector4i => Self::Vector4i,
-            V::Plane => Self::Plane,
-            V::Quaternion => Self::Quaternion,
-            V::Aabb => Self::Aabb,
-            V::Basis => Self::Basis,
-            V::Transform3D => Self::Transform3D,
-            V::Projection => Self::Projection,
-            V::Color => Self::Color,
-            V::StringName => Self::StringName,
-            V::NodePath => Self::NodePath,
-            V::Rid => Self::Rid,
-            V::Object => Self::Object,
-            V::Callable => Self::Callable,
-            V::Signal => Self::Signal,
-            V::Dictionary => Self::Dictionary,
-            V::Array => Self::Array,
-            V::PackedByteArray => Self::PackedByteArray,
-            V::PackedInt32Array => Self::PackedInt32Array,
-            V::PackedInt64Array => Self::PackedInt64Array,
-            V::PackedFloat32Array => Self::PackedFloat32Array,
-            V::PackedFloat64Array => Self::PackedInt64Array,
-            V::PackedStringArray => Self::PackedStringArray,
-            V::PackedVector2Array => Self::PackedVector2Array,
-            V::PackedVector3Array => Self::PackedVector3Array,
-            V::PackedColorArray => Self::PackedColorArray,
-        }
-    }
-}
-
-impl From<VariantType> for RemoteVariantType {
-    fn from(value: VariantType) -> Self {
-        use VariantType as V;
-
-        match value {
-            V::Nil => Self::Nil,
-            V::Bool => Self::Bool,
-            V::Int => Self::Int,
-            V::Float => Self::Float,
-            V::String => Self::String,
-            V::Vector2 => Self::Vector2,
-            V::Vector2i => Self::Vector2i,
-            V::Rect2 => Self::Rect2,
-            V::Rect2i => Self::Vector2i,
-            V::Vector3 => Self::Vector3,
-            V::Vector3i => Self::Vector3i,
-            V::Transform2D => Self::Transform2D,
-            V::Vector4 => Self::Vector4,
-            V::Vector4i => Self::Vector4i,
-            V::Plane => Self::Plane,
-            V::Quaternion => Self::Quaternion,
-            V::Aabb => Self::Aabb,
-            V::Basis => Self::Basis,
-            V::Transform3D => Self::Transform3D,
-            V::Projection => Self::Projection,
-            V::Color => Self::Color,
-            V::StringName => Self::StringName,
-            V::NodePath => Self::NodePath,
-            V::Rid => Self::Rid,
-            V::Object => Self::Object,
-            V::Callable => Self::Callable,
-            V::Signal => Self::Signal,
-            V::Dictionary => Self::Dictionary,
-            V::Array => Self::Array,
-            V::PackedByteArray => Self::PackedByteArray,
-            V::PackedInt32Array => Self::PackedInt32Array,
-            V::PackedInt64Array => Self::PackedInt64Array,
-            V::PackedFloat32Array => Self::PackedFloat32Array,
-            V::PackedFloat64Array => Self::PackedInt64Array,
-            V::PackedStringArray => Self::PackedStringArray,
-            V::PackedVector2Array => Self::PackedVector2Array,
-            V::PackedVector3Array => Self::PackedVector3Array,
-            V::PackedColorArray => Self::PackedColorArray,
-        }
-    }
-}
-
-#[derive(StableAbi, Debug, Clone)]
-#[repr(C)]
-#[sabi(unsafe_opaque_fields)]
-pub struct RemoteValue(godot::sys::GDExtensionVariantPtr);
-
-impl RemoteValue {
-    pub fn new(ptr: godot::sys::GDExtensionVariantPtr) -> Self {
-        Self(ptr)
-    }
-}
-
-impl From<Variant> for RemoteValue {
-    fn from(value: Variant) -> Self {
-        let ptr = Box::into_raw(Box::new(value)) as godot::sys::GDExtensionVariantPtr;
-
-        Self(ptr)
-    }
-}
-
-impl From<RemoteValue> for Variant {
-    fn from(value: RemoteValue) -> Self {
-        unsafe { Self::from_var_sys(value.0) }
-    }
-}
-
-#[derive(StableAbi, Debug, Clone)]
-#[repr(C)]
-#[sabi(unsafe_opaque_fields)]
-pub struct RemoteValueRef<'a> {
-    ptr: godot::sys::GDExtensionVariantPtr,
-    lt: PhantomData<&'a ()>,
-}
-
-impl<'a> RemoteValueRef<'a> {
-    pub fn new(value: &'a Variant) -> Self {
-        Self {
-            ptr: value.var_sys(),
-            lt: PhantomData,
-        }
-    }
-
-    fn as_ref(&self) -> &'a Variant {
-        unsafe { &*(self.ptr as *const Variant) }
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn godot_call_error_type_to_u32(err: godot::sys::GDExtensionCallErrorType) -> u32 {
-    err
-}
-
-#[cfg(target_os = "windows")]
-fn godot_call_error_type_to_u32(err: godot::sys::GDExtensionCallErrorType) -> u32 {
-    err as u32
 }

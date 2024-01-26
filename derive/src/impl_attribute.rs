@@ -117,7 +117,7 @@ pub fn godot_script_impl(
                 fnc.span() =>
                 ::godot_rust_script::RustScriptMethodDesc {
                     name: #fn_name_str,
-                    arguments: vec![#args_meta],
+                    arguments: Box::new([#args_meta]),
                     return_type: ::godot_rust_script::RustScriptPropDesc {
                         name: #fn_name_str,
                         ty: #fn_return_ty,

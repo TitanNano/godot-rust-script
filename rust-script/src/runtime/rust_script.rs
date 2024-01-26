@@ -6,7 +6,6 @@
 
 use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
-use abi_stable::std_types::RBox;
 use godot::{
     builtin::meta::{MethodInfo, PropertyInfo, ToGodot},
     engine::{
@@ -20,9 +19,8 @@ use godot::{
         VariantArray,
     },
 };
-use RemoteGodotScript_trait::RemoteGodotScript_TO;
 
-use crate::{apply::Apply, script_registry::RemoteGodotScript_trait};
+use crate::{apply::Apply, script_registry::GodotScriptObject};
 
 use super::{
     downgrade_self::DowngradeSelf,
@@ -78,10 +76,7 @@ impl RustScript {
         self.class_name.to_string()
     }
 
-    pub fn create_remote_instance(
-        &self,
-        base: Gd<Object>,
-    ) -> RemoteGodotScript_TO<'static, RBox<()>> {
+    pub fn create_remote_instance(&self, base: Gd<Object>) -> Box<dyn GodotScriptObject> {
         let reg = SCRIPT_REGISTRY.read().expect("failed to obtain read lock");
 
         let meta_data = reg
@@ -241,7 +236,7 @@ impl IScriptExtension for RustScript {
         script
             .signals()
             .iter()
-            .map(|signal| MethodInfo::from(signal.to_owned()).to_dict())
+            .map(|signal| MethodInfo::from(signal).to_dict())
             .collect()
     }
 
@@ -257,7 +252,7 @@ impl IScriptExtension for RustScript {
         script
             .signals()
             .iter()
-            .any(|signal| signal.name.as_str() == name.to_string())
+            .any(|signal| signal.name == name.to_string())
     }
 
     fn update_exports(&mut self) {}
@@ -270,7 +265,7 @@ impl IScriptExtension for RustScript {
                 class
                     .methods()
                     .iter()
-                    .map(|method| MethodInfo::from(method.to_owned()).to_dict())
+                    .map(|method| MethodInfo::from(method).to_dict())
                     .collect()
             })
             .unwrap_or_default()
@@ -284,7 +279,7 @@ impl IScriptExtension for RustScript {
                 class
                     .properties()
                     .iter()
-                    .map(|prop| PropertyInfo::from(prop.to_owned()).to_dict())
+                    .map(|prop| PropertyInfo::from(prop).to_dict())
                     .collect()
             })
             .unwrap_or_default()
@@ -314,7 +309,7 @@ impl IScriptExtension for RustScript {
                     .methods()
                     .iter()
                     .find(|method| method.method_name == method_name.to_string())
-                    .map(|method| MethodInfo::from(method.to_owned()).to_dict())
+                    .map(|method| MethodInfo::from(method).to_dict())
             })
             .unwrap_or_default()
     }

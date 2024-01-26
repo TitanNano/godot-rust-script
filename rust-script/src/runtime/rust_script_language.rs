@@ -16,9 +16,9 @@ use godot::{
 };
 use itertools::Itertools;
 
-use crate::apply::Apply;
+use crate::{apply::Apply, RustScriptMetaData};
 
-use super::{metadata::ScriptMetaData, rust_script::RustScript, SCRIPT_REGISTRY};
+use super::{rust_script::RustScript, SCRIPT_REGISTRY};
 
 #[derive(GodotClass)]
 #[class(base = ScriptLanguageExtension, tool)]
@@ -58,7 +58,7 @@ impl RustScriptLanguage {
             .map(|gd| gd.cast())
     }
 
-    pub fn script_meta_data(class_name: &str) -> Option<ScriptMetaData> {
+    pub fn script_meta_data(class_name: &str) -> Option<RustScriptMetaData> {
         let reg = SCRIPT_REGISTRY
             .read()
             .expect("unable to obtain read access");

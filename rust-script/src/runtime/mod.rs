@@ -24,11 +24,9 @@ use godot::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    runtime::{
-        metadata::ScriptMetaData, resource_loader::RustScriptResourceLoader,
-        resource_saver::RustScriptResourceSaver,
-    },
+    runtime::{resource_loader::RustScriptResourceLoader, resource_saver::RustScriptResourceSaver},
     shared::RustScriptLibInit,
+    RustScriptMetaData,
 };
 
 use self::rust_script_language::RustScriptLanguage;
@@ -59,7 +57,8 @@ macro_rules! deinit {
     };
 }
 
-static SCRIPT_REGISTRY: Lazy<RwLock<HashMap<String, ScriptMetaData>>> = Lazy::new(RwLock::default);
+static SCRIPT_REGISTRY: Lazy<RwLock<HashMap<String, RustScriptMetaData>>> =
+    Lazy::new(RwLock::default);
 
 #[derive(GodotClass)]
 #[class(base = Object, init)]
@@ -172,13 +171,9 @@ impl RustScriptExtensionLayer {
 fn load_rust_scripts<F: RustScriptLibInit>(lib_init_fn: F) {
     let result = lib_init_fn();
 
-    let registry: HashMap<String, ScriptMetaData> = result
+    let registry: HashMap<String, RustScriptMetaData> = result
         .into_iter()
-        .map(|script| {
-            let local: ScriptMetaData = script.into();
-
-            (local.class_name().to_string(), local)
-        })
+        .map(|script| (script.class_name().to_string(), script))
         .collect();
 
     let mut reg = SCRIPT_REGISTRY

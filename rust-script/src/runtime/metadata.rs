@@ -6,78 +6,16 @@
 
 use std::ops::Deref;
 
-use abi_stable::std_types::RBox;
 use godot::{
     obj::{EngineBitfield, EngineEnum},
     prelude::{
-        meta::{ClassName, MethodInfo, PropertyInfo},
-        Array, Dictionary, Gd, Object, StringName, ToGodot,
+        meta::{MethodInfo, PropertyInfo},
+        Array, Dictionary,
     },
     sys::VariantType,
 };
 
-use crate::{
-    apply::Apply,
-    script_registry::{
-        CreateScriptInstanceData_TO, RemoteGodotScript_TO, RemoteScriptMetaData,
-        RemoteScriptMethodInfo, RemoteScriptPropertyInfo, RemoteScriptSignalInfo,
-    },
-};
-
-#[derive(Debug, Clone)]
-pub struct ScriptMetaData {
-    class_name: ClassName,
-    base_type_name: StringName,
-    properties: Vec<RemoteScriptPropertyInfo>,
-    methods: Vec<RemoteScriptMethodInfo>,
-    signals: Vec<RemoteScriptSignalInfo>,
-    create_data: CreateScriptInstanceData_TO<'static, RBox<()>>,
-    description: &'static str,
-}
-
-impl ScriptMetaData {
-    pub fn class_name(&self) -> ClassName {
-        self.class_name
-    }
-
-    pub fn base_type_name(&self) -> StringName {
-        self.base_type_name.clone()
-    }
-
-    pub fn create_data(&self, base: Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>> {
-        self.create_data.create(base.to_variant().into())
-    }
-
-    pub fn properties(&self) -> &[RemoteScriptPropertyInfo] {
-        &self.properties
-    }
-
-    pub fn methods(&self) -> &[RemoteScriptMethodInfo] {
-        &self.methods
-    }
-
-    pub fn signals(&self) -> &[RemoteScriptSignalInfo] {
-        &self.signals
-    }
-
-    pub fn description(&self) -> &'static str {
-        self.description
-    }
-}
-
-impl From<RemoteScriptMetaData> for ScriptMetaData {
-    fn from(value: RemoteScriptMetaData) -> Self {
-        Self {
-            class_name: ClassName::from_ascii_cstr(value.class_name.as_str().as_bytes()),
-            base_type_name: StringName::from(&value.base_type_name.as_str()),
-            properties: value.properties.to_vec(),
-            methods: value.methods.to_vec(),
-            signals: value.signals.to_vec(),
-            create_data: value.create_data,
-            description: value.description.as_str(),
-        }
-    }
-}
+use crate::apply::Apply;
 
 pub(super) trait ToDictionary {
     fn to_dict(&self) -> Dictionary;
@@ -197,29 +135,29 @@ pub struct Documented<T> {
     description: &'static str,
 }
 
-impl From<crate::script_registry::RemoteScriptPropertyInfo> for Documented<PropertyInfo> {
-    fn from(value: crate::script_registry::RemoteScriptPropertyInfo) -> Self {
+impl From<crate::script_registry::RustScriptPropertyInfo> for Documented<PropertyInfo> {
+    fn from(value: crate::script_registry::RustScriptPropertyInfo) -> Self {
         Self {
-            description: value.description.as_str(),
-            inner: value.into(),
+            description: value.description,
+            inner: (&value).into(),
         }
     }
 }
 
-impl From<crate::script_registry::RemoteScriptMethodInfo> for Documented<MethodInfo> {
-    fn from(value: crate::script_registry::RemoteScriptMethodInfo) -> Self {
+impl From<crate::script_registry::RustScriptMethodInfo> for Documented<MethodInfo> {
+    fn from(value: crate::script_registry::RustScriptMethodInfo) -> Self {
         Self {
-            description: value.description.as_str(),
-            inner: value.into(),
+            description: value.description,
+            inner: (&value).into(),
         }
     }
 }
 
-impl From<crate::script_registry::RemoteScriptSignalInfo> for Documented<MethodInfo> {
-    fn from(value: crate::script_registry::RemoteScriptSignalInfo) -> Self {
+impl From<crate::script_registry::RustScriptSignalInfo> for Documented<MethodInfo> {
+    fn from(value: crate::script_registry::RustScriptSignalInfo) -> Self {
         Self {
-            description: value.description.as_str(),
-            inner: value.into(),
+            description: value.description,
+            inner: (&value).into(),
         }
     }
 }

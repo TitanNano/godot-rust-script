@@ -6,10 +6,6 @@
 
 use std::collections::BTreeMap;
 
-use abi_stable::{
-    sabi_trait::TD_Opaque,
-    std_types::{RBox, RStr, RString, RVec},
-};
 use godot::{
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
     obj::{EngineBitfield, EngineEnum},
@@ -17,12 +13,11 @@ use godot::{
     sys::VariantType,
 };
 
-pub use crate::script_registry::{
-    GodotScript, GodotScriptImpl, RemoteScriptMetaData, RemoteScriptMethodInfo,
+use crate::script_registry::{
+    CreateScriptInstanceData, GodotScriptObject, RustScriptPropertyInfo, RustScriptSignalInfo,
 };
-use crate::{
-    apply::Apply,
-    script_registry::{RemoteGodotScript_TO, RemoteScriptPropertyInfo, RemoteScriptSignalInfo},
+pub use crate::script_registry::{
+    GodotScript, GodotScriptImpl, RustScriptMetaData, RustScriptMethodInfo,
 };
 pub use signals::{ScriptSignal, Signal, SignalArguments};
 
@@ -68,8 +63,7 @@ macro_rules! register_script_methods {
 macro_rules! setup_library {
     () => {
         #[no_mangle]
-        pub fn __godot_rust_script_init(
-        ) -> $crate::private_export::RVec<$crate::RemoteScriptMetaData> {
+        pub fn __godot_rust_script_init() -> ::std::vec::Vec<$crate::RustScriptMetaData> {
             use $crate::godot::obj::EngineEnum;
             use $crate::private_export::*;
 
@@ -100,7 +94,7 @@ pub struct RustScriptEntry {
     pub base_type_name: &'static str,
     pub properties: fn() -> Vec<RustScriptPropDesc>,
     pub signals: fn() -> Vec<RustScriptSignalDesc>,
-    pub create_data: fn(Gd<Object>) -> RemoteGodotScript_TO<'static, RBox<()>>,
+    pub create_data: fn(Gd<Object>) -> Box<dyn GodotScriptObject>,
     pub description: &'static str,
 }
 
@@ -126,19 +120,19 @@ pub struct RustScriptPropDesc {
 }
 
 impl RustScriptPropDesc {
-    pub fn into_property_info(self, class_name: &'static str) -> RemoteScriptPropertyInfo {
-        RemoteScriptPropertyInfo {
-            variant_type: self.ty.into(),
-            class_name: RStr::from_str(class_name),
-            property_name: RString::with_capacity(self.name.len()).apply(|s| s.push_str(self.name)),
+    pub fn to_property_info(&self, class_name: &'static str) -> RustScriptPropertyInfo {
+        RustScriptPropertyInfo {
+            variant_type: self.ty,
+            class_name,
+            property_name: self.name,
             usage: if self.exported {
                 (PropertyUsageFlags::EDITOR | PropertyUsageFlags::STORAGE).ord()
             } else {
                 PropertyUsageFlags::NONE.ord()
             },
             hint: self.hint.ord(),
-            hint_string: self.hint_string.into(),
-            description: RStr::from_str(self.description),
+            hint_string: self.hint_string,
+            description: self.description,
         }
     }
 }
@@ -146,58 +140,58 @@ impl RustScriptPropDesc {
 pub struct RustScriptMethodDesc {
     pub name: &'static str,
     pub return_type: RustScriptPropDesc,
-    pub arguments: Vec<RustScriptPropDesc>,
+    pub arguments: Box<[RustScriptPropDesc]>,
     pub flags: MethodFlags,
     pub description: &'static str,
 }
 
 impl RustScriptMethodDesc {
-    pub fn into_method_info(self, id: i32, class_name: &'static str) -> RemoteScriptMethodInfo {
-        RemoteScriptMethodInfo {
+    pub fn to_method_info(self, id: i32, class_name: &'static str) -> RustScriptMethodInfo {
+        RustScriptMethodInfo {
             id,
-            method_name: self.name.into(),
-            class_name: class_name.into(),
-            return_type: self.return_type.into_property_info(class_name),
+            method_name: self.name,
+            class_name,
+            return_type: self.return_type.to_property_info(class_name),
             flags: self.flags.ord(),
             arguments: self
                 .arguments
-                .into_iter()
-                .map(|arg| arg.into_property_info(class_name))
+                .iter()
+                .map(|arg| arg.to_property_info(class_name))
                 .collect(),
-            description: RStr::from_str(self.description),
+            description: self.description,
         }
     }
 }
 
 pub struct RustScriptSignalDesc {
     pub name: &'static str,
-    pub arguments: Vec<RustScriptPropDesc>,
+    pub arguments: Box<[RustScriptPropDesc]>,
     pub description: &'static str,
 }
 
-impl From<RustScriptSignalDesc> for RemoteScriptSignalInfo {
+impl From<RustScriptSignalDesc> for RustScriptSignalInfo {
     fn from(value: RustScriptSignalDesc) -> Self {
         Self {
-            name: value.name.into(),
+            name: value.name,
             arguments: value
                 .arguments
-                .into_iter()
-                .map(|arg| arg.into_property_info("\0"))
+                .iter()
+                .map(|arg| arg.to_property_info("\0"))
                 .collect(),
-            description: value.description.into(),
+            description: value.description,
         }
     }
 }
 
-pub fn create_default_data_struct<T: GodotScript + 'static>(
+pub fn create_default_data_struct<T: GodotScript + GodotScriptObject + 'static>(
     base: Gd<Object>,
-) -> RemoteGodotScript_TO<'static, RBox<()>> {
-    RemoteGodotScript_TO::from_value(T::default_with_base(base), TD_Opaque)
+) -> Box<dyn GodotScriptObject> {
+    Box::new(T::default_with_base(base))
 }
 
 pub fn assemble_metadata<'a>(
     items: impl Iterator<Item = &'a RegistryItem> + 'a,
-) -> RVec<RemoteScriptMetaData> {
+) -> Vec<RustScriptMetaData> {
     let (entries, methods): (Vec<_>, Vec<_>) = items
         .map(|item| match item {
             RegistryItem::Entry(entry) => (Some(entry), None),
@@ -213,7 +207,7 @@ pub fn assemble_metadata<'a>(
         .map(|class| {
             let props = (class.properties)()
                 .into_iter()
-                .map(|prop| prop.into_property_info(class.class_name))
+                .map(|prop| prop.to_property_info(class.class_name))
                 .collect();
 
             let methods = methods
@@ -221,24 +215,22 @@ pub fn assemble_metadata<'a>(
                 .into_iter()
                 .flat_map(|entry| (entry.methods)())
                 .enumerate()
-                .map(|(index, method)| {
-                    method.into_method_info((index + 1) as i32, class.class_name)
-                })
+                .map(|(index, method)| method.to_method_info((index + 1) as i32, class.class_name))
                 .collect();
 
             let signals = (class.signals)().into_iter().map(Into::into).collect();
 
-            let create_data = class.create_data;
+            let create_data: Box<dyn CreateScriptInstanceData> = Box::new(class.create_data);
             let description = class.description;
 
-            RemoteScriptMetaData::new(
-                class.class_name.into(),
+            RustScriptMetaData::new(
+                class.class_name,
                 class.base_type_name.into(),
                 props,
                 methods,
                 signals,
                 create_data,
-                description.into(),
+                description,
             )
         })
         .collect()
