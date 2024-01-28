@@ -254,6 +254,7 @@ fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
             };
 
             quote! {
+                #[allow(clippy::needless_borrow)]
                 #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&#accessor)),
             }
         })
