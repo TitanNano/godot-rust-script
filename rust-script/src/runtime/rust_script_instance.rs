@@ -101,11 +101,7 @@ impl ScriptInstance for RustScriptInstance {
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        self.data
-            .call(method, args)
-            .map(Into::into)
-            // GDExtensionCallErrorType is not guaranteed to be a u32
-            .map_err(|err: u32| err as godot::sys::GDExtensionCallErrorType)
+        self.data.call(method, args)
     }
 
     fn get_script(&self) -> &Gd<Script> {
