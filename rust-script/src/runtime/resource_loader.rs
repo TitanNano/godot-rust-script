@@ -62,7 +62,7 @@ impl IResourceFormatLoader for RustScriptResourceLoader {
             return GString::new();
         }
 
-        if script_lang.validate_path(path).is_empty() {
+        if !script_lang.validate_path(path).is_empty() {
             return GString::new();
         }
 
