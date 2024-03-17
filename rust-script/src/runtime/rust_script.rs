@@ -7,13 +7,16 @@
 use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
 use godot::{
-    builtin::meta::{MethodInfo, PropertyInfo, ToGodot},
+    builtin::{
+        meta::{MethodInfo, PropertyInfo, ToGodot},
+        Callable,
+    },
     engine::{
-        create_script_instance, notify::ObjectNotification, ClassDb, Engine, IScriptExtension,
-        Script, ScriptExtension, ScriptInstance, ScriptLanguage, WeakRef,
+        create_script_instance, notify::ObjectNotification, object::ConnectFlags, ClassDb, Engine,
+        IScriptExtension, Script, ScriptExtension, ScriptLanguage, WeakRef,
     },
     log::{godot_error, godot_print, godot_warn},
-    obj::{InstanceId, WithBaseField},
+    obj::{EngineEnum, InstanceId, WithBaseField},
     prelude::{
         godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, StringName, Variant,
         VariantArray,
@@ -35,18 +38,17 @@ const NOTIFICATION_EXTENSION_RELOADED: i32 = 2;
 #[derive(GodotClass)]
 #[class(base = ScriptExtension, tool)]
 pub(super) struct RustScript {
-    #[var(get = get_class_name, set = set_class_name, usage_flags = [PROPERTY_USAGE_STORAGE])]
+    #[var(get = get_class_name, set = set_class_name, usage_flags = [STORAGE])]
     class_name: GString,
 
-    #[var(usage_flags = [PROPERTY_USAGE_STORAGE])]
+    #[var(usage_flags = [STORAGE])]
     source_code: GString,
 
-    #[var( get = owner_ids, set = set_owner_ids, usage_flags = [PROPERTY_USAGE_STORAGE])]
+    #[var( get = owner_ids, set = set_owner_ids, usage_flags = [STORAGE])]
     #[allow(dead_code)]
     owner_ids: Array<i64>,
 
     owners: RefCell<Vec<Gd<WeakRef>>>,
-    #[base]
     base: Base<ScriptExtension>,
 }
 
@@ -121,29 +123,28 @@ impl RustScript {
             .collect();
     }
 
-    fn init_script_instance(instance: &mut RustScriptInstance) {
-        match instance.call(StringName::from("_init"), &[]) {
-            Ok(_) => (),
-            Err(err) => {
-                use godot::sys::*;
-
-                if !matches!(
-                    err,
-                    GDEXTENSION_CALL_OK | GDEXTENSION_CALL_ERROR_INVALID_METHOD
-                ) {
-                    let error_code = match err {
-                        GDEXTENSION_CALL_ERROR_INSTANCE_IS_NULL => "INSTANCE_IS_NULL",
-                        GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT => "INVALID_ARGUMENT",
-                        GDEXTENSION_CALL_ERROR_METHOD_NOT_CONST => "METHOD_NOT_CONST",
-                        GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS => "TOO_FEW_ARGUMENTS",
-                        GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS => "TOO_MANY_ARGUMENTS",
-                        _ => "UNKNOWN",
-                    };
-
-                    godot_error!("failed to call rust script _init fn: {}", error_code);
-                }
-            }
+    #[func]
+    fn init_script_instance(base: Variant) {
+        let mut base: Gd<Object> = match base.try_to() {
+            Ok(base) => base,
+            Err(err) => panic!(
+                "init_rust_script_instance was called without base object bind!\n{}",
+                err
+            ),
         };
+
+        if let Err(err) = base.get_script().try_to::<Gd<RustScript>>() {
+            godot_warn!("expected new script to be previously assigned RustScript, but it wasn't!");
+            godot_warn!("{}", err);
+
+            return;
+        }
+
+        if !base.has_method("_init".into()) {
+            return;
+        }
+
+        base.call(StringName::from("_init"), &[]);
     }
 }
 
@@ -194,16 +195,26 @@ impl IScriptExtension for RustScript {
         false
     }
 
-    unsafe fn instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
+    unsafe fn instance_create(&self, mut for_object: Gd<Object>) -> *mut c_void {
         self.owners
             .borrow_mut()
             .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
 
         let data = self.create_remote_instance(for_object.clone());
-        let mut instance = RustScriptInstance::new(data, for_object, self.to_gd());
+        let instance = RustScriptInstance::new(data, for_object.clone(), self.to_gd());
 
-        Self::init_script_instance(&mut instance);
-        create_script_instance(instance)
+        let callbale_args = VariantArray::from(&[for_object.to_variant()]);
+
+        for_object
+            .connect_ex(
+                StringName::from("script_changed"),
+                Callable::from_object_method(&self.to_gd(), "init_script_instance")
+                    .bindv(callbale_args),
+            )
+            .flags(ConnectFlags::ONE_SHOT.ord() as u32)
+            .done();
+
+        create_script_instance(instance, for_object)
     }
 
     unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
@@ -213,7 +224,7 @@ impl IScriptExtension for RustScript {
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
-        create_script_instance(placeholder)
+        create_script_instance(placeholder, for_object)
     }
 
     fn is_valid(&self) -> bool {

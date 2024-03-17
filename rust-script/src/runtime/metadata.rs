@@ -7,11 +7,9 @@
 use std::ops::Deref;
 
 use godot::{
+    builtin::meta::{MethodInfo, PropertyInfo},
     obj::{EngineBitfield, EngineEnum},
-    prelude::{
-        meta::{MethodInfo, PropertyInfo},
-        Array, Dictionary,
-    },
+    prelude::{Array, Dictionary},
     sys::VariantType,
 };
 

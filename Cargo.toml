@@ -10,7 +10,7 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-godot = { git = "https://github.com/godot-rust/gdext", rev = "7fd1be904efccd71a9eb980c2e6fffa2d8705ec4" }
+godot = { git = "https://github.com/godot-rust/gdext", rev = "22fd33d4d5213a3fe5db9a58547888cebe35c647" }
 itertools = "0.10.3"
 rand = "0.8.5"
 darling = { version = "0.20.3" }
