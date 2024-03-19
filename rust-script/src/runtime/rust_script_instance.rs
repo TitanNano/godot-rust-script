@@ -7,11 +7,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use godot::{
+    builtin::meta::{MethodInfo, PropertyInfo},
     engine::{Script, ScriptInstance},
-    prelude::{
-        meta::{MethodInfo, PropertyInfo},
-        GString, Gd, Object, StringName, Variant, VariantType,
-    },
+    prelude::{GString, Gd, Object, StringName, Variant, VariantType},
 };
 
 use crate::script_registry::GodotScriptObject;
@@ -80,11 +78,11 @@ impl ScriptInstance for RustScriptInstance {
         script_class_name(&self.script)
     }
 
-    fn set(&mut self, name: StringName, value: &Variant) -> bool {
+    fn set_property(&mut self, name: StringName, value: &Variant) -> bool {
         self.data.set(name, value.to_owned())
     }
 
-    fn get(&self, name: StringName) -> Option<Variant> {
+    fn get_property(&self, name: StringName) -> Option<Variant> {
         self.data.get(name)
     }
 
@@ -135,7 +133,7 @@ impl ScriptInstance for RustScriptInstance {
             .iter()
             .map(|prop| &prop.property_name)
             .filter_map(|name| {
-                self.get(name.to_owned())
+                self.get_property(name.to_owned())
                     .map(|value| (name.to_owned(), value))
             })
             .collect()
@@ -187,7 +185,7 @@ impl ScriptInstance for RustScriptPlaceholder {
         script_class_name(&self.script)
     }
 
-    fn set(&mut self, name: StringName, value: &Variant) -> bool {
+    fn set_property(&mut self, name: StringName, value: &Variant) -> bool {
         let exists = self
             .get_property_list()
             .iter()
@@ -201,7 +199,7 @@ impl ScriptInstance for RustScriptPlaceholder {
         true
     }
 
-    fn get(&self, name: StringName) -> Option<Variant> {
+    fn get_property(&self, name: StringName) -> Option<Variant> {
         self.properties.get(&name).cloned()
     }
 

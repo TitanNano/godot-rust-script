@@ -7,13 +7,13 @@
 use std::{collections::HashMap, fmt::Debug, sync::Arc};
 
 use godot::{
-    builtin::GString,
+    builtin::{
+        meta::{ClassName, MethodInfo, PropertyInfo},
+        GString,
+    },
     engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
     obj::{EngineBitfield, EngineEnum},
-    prelude::{
-        meta::{ClassName, MethodInfo, PropertyInfo},
-        Gd, Object, StringName, Variant,
-    },
+    prelude::{Gd, Object, StringName, Variant},
     sys::VariantType,
 };
 

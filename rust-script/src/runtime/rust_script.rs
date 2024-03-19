@@ -35,18 +35,17 @@ const NOTIFICATION_EXTENSION_RELOADED: i32 = 2;
 #[derive(GodotClass)]
 #[class(base = ScriptExtension, tool)]
 pub(super) struct RustScript {
-    #[var(get = get_class_name, set = set_class_name, usage_flags = [PROPERTY_USAGE_STORAGE])]
+    #[var(get = get_class_name, set = set_class_name, usage_flags = [STORAGE])]
     class_name: GString,
 
-    #[var(usage_flags = [PROPERTY_USAGE_STORAGE])]
+    #[var(usage_flags = [STORAGE])]
     source_code: GString,
 
-    #[var( get = owner_ids, set = set_owner_ids, usage_flags = [PROPERTY_USAGE_STORAGE])]
+    #[var( get = owner_ids, set = set_owner_ids, usage_flags = [STORAGE])]
     #[allow(dead_code)]
     owner_ids: Array<i64>,
 
     owners: RefCell<Vec<Gd<WeakRef>>>,
-    #[base]
     base: Base<ScriptExtension>,
 }
 
