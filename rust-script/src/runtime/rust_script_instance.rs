@@ -5,14 +5,14 @@
  */
 
 use core::panic;
-use std::{collections::HashMap, fmt::Debug, ops::DerefMut, pin::Pin};
+use std::{collections::HashMap, fmt::Debug, ops::DerefMut};
 
 use godot::{
     builtin::meta::{MethodInfo, PropertyInfo},
     engine::{Script, ScriptInstance, SiMut},
     prelude::{GString, Gd, Object, StringName, Variant, VariantType},
 };
-use godot_cell::GdCell;
+use godot_cell::blocking::GdCell;
 
 use crate::script_registry::GodotScriptObject;
 
@@ -51,7 +51,7 @@ fn script_property_list(script: &Gd<RustScript>) -> Box<[PropertyInfo]> {
 }
 
 pub struct Context<'a> {
-    cell: Pin<&'a GdCell<Box<dyn GodotScriptObject>>>,
+    cell: &'a GdCell<Box<dyn GodotScriptObject>>,
     data_ptr: *mut Box<dyn GodotScriptObject>,
 }
 
@@ -63,7 +63,7 @@ impl<'a> Debug for Context<'a> {
 
 impl<'a> Context<'a> {
     unsafe fn new(
-        cell: Pin<&'a GdCell<Box<dyn GodotScriptObject>>>,
+        cell: &'a GdCell<Box<dyn GodotScriptObject>>,
         data_ptr: *mut Box<dyn GodotScriptObject>,
     ) -> Self {
         Self { cell, data_ptr }
@@ -100,7 +100,7 @@ impl<'a> Context<'a> {
 }
 
 pub(super) struct RustScriptInstance {
-    data: Pin<Box<GdCell<Box<dyn GodotScriptObject>>>>,
+    data: GdCell<Box<dyn GodotScriptObject>>,
 
     script: Gd<RustScript>,
     generic_script: Gd<Script>,
@@ -132,14 +132,14 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn set_property(this: SiMut<Self>, name: StringName, value: &Variant) -> bool {
-        let cell_ref = this.data.as_ref();
+        let cell_ref = &this.data;
         let mut mut_data = cell_ref.borrow_mut().unwrap();
 
         mut_data.set(name, value.to_owned())
     }
 
     fn get_property(&self, name: StringName) -> Option<Variant> {
-        let guard = self.data.as_ref().borrow().unwrap();
+        let guard = self.data.borrow().unwrap();
 
         guard.get(name)
     }
@@ -157,7 +157,7 @@ impl ScriptInstance for RustScriptInstance {
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        let cell = this.data.as_ref();
+        let cell = &this.data;
         let mut data_guard = cell.borrow_mut().unwrap();
         let data = data_guard.deref_mut();
         let data_ptr = data as *mut _;
@@ -186,7 +186,7 @@ impl ScriptInstance for RustScriptInstance {
             .iter()
             .find(|prop| prop.property_name == name)
             .map(|prop| prop.variant_type)
-            .unwrap_or(godot::sys::VariantType::Nil)
+            .unwrap_or(godot::sys::VariantType::NIL)
     }
 
     fn to_string(&self) -> GString {
@@ -306,7 +306,7 @@ impl ScriptInstance for RustScriptPlaceholder {
             .iter()
             .find(|prop| prop.property_name == name)
             .map(|prop| prop.variant_type)
-            .unwrap_or(VariantType::Nil)
+            .unwrap_or(VariantType::NIL)
     }
 
     fn to_string(&self) -> GString {
