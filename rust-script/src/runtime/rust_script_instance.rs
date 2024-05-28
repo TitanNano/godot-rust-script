@@ -7,11 +7,9 @@
 use std::{collections::HashMap, rc::Rc};
 
 use godot::{
-    engine::{Script, ScriptInstance},
-    prelude::{
-        meta::{MethodInfo, PropertyInfo},
-        GString, Gd, Object, StringName, Variant, VariantType,
-    },
+    builtin::meta::{MethodInfo, PropertyInfo},
+    engine::{Script, ScriptInstance, SiMut},
+    prelude::{GString, Gd, Object, StringName, Variant, VariantType},
 };
 
 use crate::script_registry::GodotScriptObject;
@@ -76,32 +74,34 @@ impl RustScriptInstance {
 }
 
 impl ScriptInstance for RustScriptInstance {
+    type Base = Object;
+
     fn class_name(&self) -> GString {
         script_class_name(&self.script)
     }
 
-    fn set(&mut self, name: StringName, value: &Variant) -> bool {
-        self.data.set(name, value.to_owned())
+    fn set_property(mut this: SiMut<Self>, name: StringName, value: &Variant) -> bool {
+        this.data.set(name, value.to_owned())
     }
 
-    fn get(&self, name: StringName) -> Option<Variant> {
+    fn get_property(&self, name: StringName) -> Option<Variant> {
         self.data.get(name)
     }
 
-    fn get_property_list(&self) -> &[PropertyInfo] {
-        self.property_list.as_ref()
+    fn get_property_list(&self) -> Vec<PropertyInfo> {
+        self.property_list.to_vec()
     }
 
-    fn get_method_list(&self) -> &[MethodInfo] {
-        self.method_list.as_ref()
+    fn get_method_list(&self) -> Vec<MethodInfo> {
+        self.method_list.to_vec()
     }
 
     fn call(
-        &mut self,
+        mut this: SiMut<Self>,
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        self.data.call(method, args)
+        this.data.call(method, args)
     }
 
     fn get_script(&self) -> &Gd<Script> {
@@ -135,7 +135,7 @@ impl ScriptInstance for RustScriptInstance {
             .iter()
             .map(|prop| &prop.property_name)
             .filter_map(|name| {
-                self.get(name.to_owned())
+                self.get_property(name.to_owned())
                     .map(|value| (name.to_owned(), value))
             })
             .collect()
@@ -157,7 +157,7 @@ impl ScriptInstance for RustScriptInstance {
         None
     }
 
-    fn property_set_fallback(&mut self, _name: StringName, _value: &Variant) -> bool {
+    fn property_set_fallback(_this: SiMut<Self>, _name: StringName, _value: &Variant) -> bool {
         false
     }
 }
@@ -183,12 +183,14 @@ impl RustScriptPlaceholder {
 }
 
 impl ScriptInstance for RustScriptPlaceholder {
+    type Base = Object;
+
     fn class_name(&self) -> GString {
         script_class_name(&self.script)
     }
 
-    fn set(&mut self, name: StringName, value: &Variant) -> bool {
-        let exists = self
+    fn set_property(mut this: SiMut<Self>, name: StringName, value: &Variant) -> bool {
+        let exists = this
             .get_property_list()
             .iter()
             .any(|prop| prop.property_name == name);
@@ -197,24 +199,24 @@ impl ScriptInstance for RustScriptPlaceholder {
             return false;
         }
 
-        self.properties.insert(name, value.to_owned());
+        this.properties.insert(name, value.to_owned());
         true
     }
 
-    fn get(&self, name: StringName) -> Option<Variant> {
+    fn get_property(&self, name: StringName) -> Option<Variant> {
         self.properties.get(&name).cloned()
     }
 
-    fn get_property_list(&self) -> &[PropertyInfo] {
-        self.property_list.as_ref()
+    fn get_property_list(&self) -> Vec<PropertyInfo> {
+        self.property_list.to_vec()
     }
 
-    fn get_method_list(&self) -> &[MethodInfo] {
-        self.method_list.as_ref()
+    fn get_method_list(&self) -> Vec<MethodInfo> {
+        self.method_list.to_vec()
     }
 
     fn call(
-        &mut self,
+        _this: SiMut<Self>,
         _method: StringName,
         _args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
@@ -270,7 +272,7 @@ impl ScriptInstance for RustScriptPlaceholder {
         None
     }
 
-    fn property_set_fallback(&mut self, _name: StringName, _value: &Variant) -> bool {
+    fn property_set_fallback(_this: SiMut<Self>, _name: StringName, _value: &Variant) -> bool {
         false
     }
 }

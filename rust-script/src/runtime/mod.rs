@@ -15,11 +15,11 @@ mod rust_script_language;
 use std::{collections::HashMap, sync::RwLock};
 
 use godot::{
-    bind::GodotClass,
     engine::{Engine, RefCounted, ResourceLoader, ResourceSaver, ScriptLanguage},
     log::godot_warn,
     obj::GodotClass,
     prelude::{godot_print, Gd},
+    register::GodotClass,
 };
 use once_cell::sync::Lazy;
 

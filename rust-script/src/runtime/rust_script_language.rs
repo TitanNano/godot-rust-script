@@ -8,6 +8,7 @@ use std::ffi::OsStr;
 
 use godot::{
     engine::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script},
+    log::godot_print,
     obj::Base,
     prelude::{
         godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray,
@@ -227,4 +228,8 @@ impl IScriptLanguageExtension for RustScriptLanguage {
 
     // godot hook to trigger script reload
     fn reload_all_scripts(&mut self) {}
+
+    fn frame(&mut self) {
+        godot_print!("script language frame called!");
+    }
 }

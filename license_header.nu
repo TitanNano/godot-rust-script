@@ -20,13 +20,13 @@ def lines []: string -> list<string> {
 }
 
 def main []: nothing -> nothing {
-  for file in (ls $"($source_root)/**/*.rs") {
-    let current_header = read_file $file.name | first $license_length
+  for file in (glob $"($source_root)/**/*.rs") {
+    let current_header = read_file $file | first $license_length
    
     if $current_header == $license_notice {
       continue
     }
 
-    read_file $file.name | prepend $license_notice | str join "\n" |  save -f $file.name
+    read_file $file | prepend $license_notice | str join "\n" |  save -f $file.name
   }
 }
