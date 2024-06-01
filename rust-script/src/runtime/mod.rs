@@ -31,6 +31,8 @@ use crate::{
 
 use self::rust_script_language::RustScriptLanguage;
 
+pub use rust_script_instance::Context;
+
 #[macro_export]
 macro_rules! setup {
     ($lib_crate:tt) => {

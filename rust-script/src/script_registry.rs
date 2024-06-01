@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::{collections::HashMap, fmt::Debug, sync::Arc};
+use std::{any::Any, collections::HashMap, fmt::Debug, sync::Arc};
 
 use godot::{
     builtin::{
@@ -17,6 +17,8 @@ use godot::{
     sys::VariantType,
 };
 
+use crate::Context;
+
 pub trait GodotScript: Debug + GodotScriptImpl {
     fn set(&mut self, name: StringName, value: Variant) -> bool;
     fn get(&self, name: StringName) -> Option<Variant>;
@@ -24,6 +26,7 @@ pub trait GodotScript: Debug + GodotScriptImpl {
         &mut self,
         method: StringName,
         args: &[&Variant],
+        context: Context,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
 
     fn to_string(&self) -> String;
@@ -37,6 +40,7 @@ pub trait GodotScriptImpl {
         &mut self,
         name: StringName,
         args: &[&Variant],
+        context: Context,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
 }
 
@@ -47,12 +51,15 @@ pub trait GodotScriptObject {
         &mut self,
         method: StringName,
         args: &[&Variant],
+        context: Context,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
     fn to_string(&self) -> String;
     fn property_state(&self) -> HashMap<StringName, Variant>;
+
+    fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
-impl<T: GodotScript> GodotScriptObject for T {
+impl<T: GodotScript + 'static> GodotScriptObject for T {
     fn set(&mut self, name: StringName, value: Variant) -> bool {
         GodotScript::set(self, name, value)
     }
@@ -65,8 +72,9 @@ impl<T: GodotScript> GodotScriptObject for T {
         &mut self,
         method: StringName,
         args: &[&Variant],
+        context: Context,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        GodotScript::call(self, method, args)
+        GodotScript::call(self, method, args, context)
     }
 
     fn to_string(&self) -> String {
@@ -75,6 +83,10 @@ impl<T: GodotScript> GodotScriptObject for T {
 
     fn property_state(&self) -> HashMap<StringName, Variant> {
         GodotScript::property_state(self)
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 

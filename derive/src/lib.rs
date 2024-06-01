@@ -132,8 +132,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             #set_fields_impl
 
-            fn call(&mut self, name: #string_name_ty, args: &[&#variant_ty]) -> ::std::result::Result<#variant_ty, #call_error_ty> {
-                ::godot_rust_script::GodotScriptImpl::call_fn(self, name, args)
+            fn call(&mut self, name: #string_name_ty, args: &[&#variant_ty], ctx: ::godot_rust_script::Context) -> ::std::result::Result<#variant_ty, #call_error_ty> {
+                ::godot_rust_script::GodotScriptImpl::call_fn(self, name, args, ctx)
             }
 
             fn to_string(&self) -> String {
@@ -203,6 +203,14 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
         )
         .into_compile_error()),
     }
+}
+
+fn is_context_type(ty: &syn::Type) -> bool {
+    let syn::Type::Path(path) = ty else {
+        return false;
+    };
+
+    path.path.segments.last().map(|segment| segment.ident == "Context").unwrap_or(false)
 }
 
 fn derive_default_with_base(field_opts: &[FieldOpts]) -> TokenStream {

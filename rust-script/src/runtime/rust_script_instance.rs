@@ -4,19 +4,21 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::{collections::HashMap, rc::Rc};
+use core::panic;
+use std::{collections::HashMap, fmt::Debug, ops::DerefMut, pin::Pin};
 
 use godot::{
     builtin::meta::{MethodInfo, PropertyInfo},
     engine::{Script, ScriptInstance, SiMut},
     prelude::{GString, Gd, Object, StringName, Variant, VariantType},
 };
+use godot_cell::GdCell;
 
 use crate::script_registry::GodotScriptObject;
 
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
 
-fn script_method_list(script: &Gd<RustScript>) -> Rc<[MethodInfo]> {
+fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
@@ -25,7 +27,7 @@ fn script_method_list(script: &Gd<RustScript>) -> Rc<[MethodInfo]> {
         .expect("script registry is inaccessible")
         .get(&class_name)
         .map(|meta| meta.methods().iter().map(MethodInfo::from).collect())
-        .unwrap_or_else(|| Rc::new([]) as Rc<[MethodInfo]>);
+        .unwrap_or_else(|| Box::new([]) as Box<[MethodInfo]>);
 
     methods
 }
@@ -34,7 +36,7 @@ fn script_class_name(script: &Gd<RustScript>) -> GString {
     script.bind().get_class_name()
 }
 
-fn script_property_list(script: &Gd<RustScript>) -> Rc<[PropertyInfo]> {
+fn script_property_list(script: &Gd<RustScript>) -> Box<[PropertyInfo]> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
@@ -43,18 +45,67 @@ fn script_property_list(script: &Gd<RustScript>) -> Rc<[PropertyInfo]> {
         .expect("script registry is inaccessible")
         .get(&class_name)
         .map(|meta| meta.properties().iter().map(PropertyInfo::from).collect())
-        .unwrap_or_else(|| Rc::new([]) as Rc<[PropertyInfo]>);
+        .unwrap_or_else(|| Box::new([]) as Box<[PropertyInfo]>);
 
     props
 }
 
+pub struct Context<'a> {
+    cell: Pin<&'a GdCell<Box<dyn GodotScriptObject>>>,
+    data_ptr: *mut Box<dyn GodotScriptObject>,
+}
+
+impl<'a> Debug for Context<'a> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Context { <Call Context> }")
+    }
+}
+
+impl<'a> Context<'a> {
+    unsafe fn new(
+        cell: Pin<&'a GdCell<Box<dyn GodotScriptObject>>>,
+        data_ptr: *mut Box<dyn GodotScriptObject>,
+    ) -> Self {
+        Self { cell, data_ptr }
+    }
+
+    pub fn reentrant_scope<T: GodotScriptObject + 'static, R>(
+        &mut self,
+        self_ref: &mut T,
+        cb: impl FnOnce() -> R,
+    ) -> R {
+        let known_ptr = unsafe {
+            let any = (*self.data_ptr).as_any_mut();
+
+            any.downcast_mut::<T>().unwrap() as *mut T
+        };
+
+        let self_ptr = self_ref as *mut _;
+
+        if known_ptr != self_ptr {
+            panic!("unable to create reentrant scope with unrelated self reference!");
+        }
+
+        let guard = self
+            .cell
+            .make_inaccessible(unsafe { &mut *self.data_ptr })
+            .unwrap();
+
+        let result = cb();
+
+        drop(guard);
+
+        result
+    }
+}
+
 pub(super) struct RustScriptInstance {
-    data: Box<dyn GodotScriptObject>,
+    data: Pin<Box<GdCell<Box<dyn GodotScriptObject>>>>,
 
     script: Gd<RustScript>,
     generic_script: Gd<Script>,
-    property_list: Rc<[PropertyInfo]>,
-    method_list: Rc<[MethodInfo]>,
+    property_list: Box<[PropertyInfo]>,
+    method_list: Box<[MethodInfo]>,
 }
 
 impl RustScriptInstance {
@@ -64,7 +115,7 @@ impl RustScriptInstance {
         script: Gd<RustScript>,
     ) -> Self {
         Self {
-            data,
+            data: GdCell::new(data),
             generic_script: script.clone().upcast(),
             property_list: script_property_list(&script),
             method_list: script_method_list(&script),
@@ -80,12 +131,17 @@ impl ScriptInstance for RustScriptInstance {
         script_class_name(&self.script)
     }
 
-    fn set_property(mut this: SiMut<Self>, name: StringName, value: &Variant) -> bool {
-        this.data.set(name, value.to_owned())
+    fn set_property(this: SiMut<Self>, name: StringName, value: &Variant) -> bool {
+        let cell_ref = this.data.as_ref();
+        let mut mut_data = cell_ref.borrow_mut().unwrap();
+
+        mut_data.set(name, value.to_owned())
     }
 
     fn get_property(&self, name: StringName) -> Option<Variant> {
-        self.data.get(name)
+        let guard = self.data.as_ref().borrow().unwrap();
+
+        guard.get(name)
     }
 
     fn get_property_list(&self) -> Vec<PropertyInfo> {
@@ -97,11 +153,18 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn call(
-        mut this: SiMut<Self>,
+        this: SiMut<Self>,
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        this.data.call(method, args)
+        let cell = this.data.as_ref();
+        let mut data_guard = cell.borrow_mut().unwrap();
+        let data = data_guard.deref_mut();
+        let data_ptr = data as *mut _;
+
+        let context = unsafe { Context::new(cell, data_ptr) };
+
+        data.call(method, args, context)
     }
 
     fn get_script(&self) -> &Gd<Script> {
@@ -127,7 +190,8 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn to_string(&self) -> GString {
-        self.data.to_string().into()
+        // self.data.to_string().into()
+        GString::new()
     }
 
     fn get_property_state(&self) -> Vec<(StringName, Variant)> {
@@ -166,8 +230,8 @@ pub(super) struct RustScriptPlaceholder {
     script: Gd<RustScript>,
     generic_script: Gd<Script>,
     properties: HashMap<StringName, Variant>,
-    property_list: Rc<[PropertyInfo]>,
-    method_list: Rc<[MethodInfo]>,
+    property_list: Box<[PropertyInfo]>,
+    method_list: Box<[MethodInfo]>,
 }
 
 impl RustScriptPlaceholder {

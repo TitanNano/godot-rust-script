@@ -4,20 +4,35 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::builtin::GString;
-use godot_rust_script::godot_script_impl;
-use godot_rust_script::GodotScript;
+use godot::builtin::{GString, StringName};
+use godot::engine::Node;
+use godot::obj::Gd;
+use godot_rust_script::{godot_script_impl, Context, GodotScript};
 
 #[derive(GodotScript, Debug)]
+#[script(base = Node)]
 struct TestScript {
     pub property_a: GString,
     #[export]
     pub editor_prop: u16,
+
+    base: Gd<Node>,
 }
 
 #[godot_script_impl]
 impl TestScript {
     pub fn record(&mut self, value: u8) -> bool {
         value > 2
+    }
+
+    pub fn action(&mut self, input: GString, mut ctx: Context) -> bool {
+        let result = input.len() > 2;
+        let mut base = self.base.clone();
+
+        ctx.reentrant_scope(self, || {
+            base.emit_signal(StringName::from("hit"), &[]);
+        });
+
+        result
     }
 }

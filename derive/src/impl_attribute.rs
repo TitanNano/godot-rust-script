@@ -9,7 +9,7 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, FnArg, ImplItem, ItemImpl, ReturnType, Type};
 
 use crate::{
-    rust_to_variant_type,
+    is_context_type, rust_to_variant_type,
     type_paths::{godot_types, property_hints, string_name_ty, variant_ty},
 };
 
@@ -56,29 +56,37 @@ pub fn godot_script_impl(
                     let arg_name = arg.pat.as_ref();
                     let arg_type = rust_to_variant_type(arg.ty.as_ref()).unwrap();
 
-                    (
-                        quote_spanned! {
-                            arg.span() =>
-                            ::godot_rust_script::RustScriptPropDesc {
-                                name: stringify!(#arg_name),
-                                ty: #arg_type,
-                                exported: false,
-                                hint: #property_hints::NONE,
-                                hint_string: "",
-                                description: "",
-                            },
-                        },
+                    is_context_type(arg.ty.as_ref()).then(|| {
+                        (
+                            quote!(),
 
-                        quote_spanned! {
-                            arg.span() =>
-                            #godot_types::prelude::FromGodot::try_from_variant(
-                                args.get(#index).ok_or(#godot_types::sys::GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS)?
-                            ).map_err(|err| {
-                                #godot_types::log::godot_error!("failed to convert variant for argument {} of {}: {}", stringify!(#arg_name), #fn_name_str,  err);
-                                #godot_types::sys::GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT
-                            })?
-                        }
-                    )
+                            quote_spanned!(arg.span() => ctx,)
+                        )
+                    }).unwrap_or_else(|| {
+                        (
+                            quote_spanned! {
+                                arg.span() =>
+                                ::godot_rust_script::RustScriptPropDesc {
+                                    name: stringify!(#arg_name),
+                                    ty: #arg_type,
+                                    exported: false,
+                                    hint: #property_hints::NONE,
+                                    hint_string: "",
+                                    description: "",
+                                },
+                            },
+
+                            quote_spanned! {
+                                arg.span() =>
+                                #godot_types::prelude::FromGodot::try_from_variant(
+                                    args.get(#index).ok_or(#godot_types::sys::GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS)?
+                                ).map_err(|err| {
+                                    #godot_types::log::godot_error!("failed to convert variant for argument {} of {}: {}", stringify!(#arg_name), #fn_name_str,  err);
+                                    #godot_types::sys::GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT
+                                })?,
+                            }
+                        )
+                    })
                 })
                 .collect();
 
@@ -143,7 +151,8 @@ pub fn godot_script_impl(
     let trait_impl = quote_spanned! {
         current_type.span() =>
         impl ::godot_rust_script::GodotScriptImpl for #current_type {
-            fn call_fn(&mut self, name: #string_name_ty, args: &[&#variant_ty]) -> ::std::result::Result<#variant_ty, #call_error_ty> {
+            #[allow(unused_variables)]
+            fn call_fn(&mut self, name: #string_name_ty, args: &[&#variant_ty], ctx: ::godot_rust_script::Context) -> ::std::result::Result<#variant_ty, #call_error_ty> {
                 match name.to_string().as_str() {
                     #method_dispatch
 

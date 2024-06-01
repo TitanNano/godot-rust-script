@@ -184,6 +184,7 @@ version = "0.1.0"
 dependencies = [
  "const-str",
  "godot",
+ "godot-cell",
  "godot-rust-script",
  "godot-rust-script-derive",
  "itertools",
