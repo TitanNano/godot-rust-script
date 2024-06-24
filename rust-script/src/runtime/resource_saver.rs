@@ -4,10 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use godot::global;
 use godot::{
-    engine::{
-        file_access, global, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script,
-    },
+    engine::{file_access, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script},
     obj::EngineBitfield,
     prelude::{godot_api, godot_print, GString, Gd, GodotClass, PackedStringArray, Resource},
 };

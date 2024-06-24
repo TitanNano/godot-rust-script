@@ -213,10 +213,10 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     ) -> Dictionary {
         let mut validation = Dictionary::new();
 
-        validation.insert("valid", "true");
-        validation.insert("errors", VariantArray::new());
-        validation.insert("functions", VariantArray::new());
-        validation.insert("warnings", VariantArray::new());
+        validation.set("valid", "true");
+        validation.set("errors", VariantArray::new());
+        validation.set("functions", VariantArray::new());
+        validation.set("warnings", VariantArray::new());
 
         validation
     }

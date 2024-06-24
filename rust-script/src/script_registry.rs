@@ -156,7 +156,7 @@ impl From<&RustScriptSignalInfo> for MethodInfo {
             method_name: value.name.into(),
             class_name: ClassName::none(),
             return_type: PropertyInfo {
-                variant_type: VariantType::Nil,
+                variant_type: VariantType::NIL,
                 class_name: ClassName::none(),
                 property_name: StringName::default(),
                 hint: PropertyHint::NONE,
