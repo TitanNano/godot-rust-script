@@ -101,14 +101,21 @@ impl FieldExportOps {
             result = Some((field, quote!(#property_hints::FILE), filters.join(",")));
         }
 
-        if self.flags.is_some() {
+        if let Some(list) = self.flags.as_ref() {
             let field = "flags";
 
             if let Some((active_field, _, _)) = result {
                 return Self::error(span, active_field, field);
             }
 
-            result = Some((field, quote!(#property_hints::FLAGS), String::new()));
+            let flags = list
+                .elems
+                .iter()
+                .map(String::from_expr)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|err| err.write_errors())?;
+
+            result = Some((field, quote!(#property_hints::FLAGS), flags.join(",")));
         }
 
         if self.global_dir {
