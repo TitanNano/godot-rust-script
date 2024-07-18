@@ -19,6 +19,7 @@ pub struct FieldExportOps {
     dir: bool,
     exp_easing: Option<syn::ExprArray>,
     file: Option<syn::ExprArray>,
+    enum_options: Option<syn::ExprArray>,
     flags: Option<syn::ExprArray>,
     #[darling(default)]
     global_dir: bool,
@@ -99,6 +100,23 @@ impl FieldExportOps {
                 .map_err(|err| err.write_errors())?;
 
             result = Some((field, quote!(#property_hints::FILE), filters.join(",")));
+        }
+
+        if let Some(list) = self.enum_options.as_ref() {
+            let field = "enum";
+
+            if let Some((active_field, _, _)) = result {
+                return Self::error(span, active_field, field);
+            }
+
+            let flags = list
+                .elems
+                .iter()
+                .map(String::from_expr)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|err| err.write_errors())?;
+
+            result = Some((field, quote!(#property_hints::ENUM), flags.join(",")));
         }
 
         if let Some(list) = self.flags.as_ref() {

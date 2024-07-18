@@ -16,6 +16,9 @@ struct TestScript {
     #[export]
     pub editor_prop: u16,
 
+    #[export(enum_options = ["inactive", "water", "teargas"])]
+    pub enum_prop: u8,
+
     base: Gd<Node>,
 }
 
