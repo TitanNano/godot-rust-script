@@ -6,8 +6,8 @@
 
 use std::collections::BTreeMap;
 
+use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
 use godot::{
-    engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
     obj::{EngineBitfield, EngineEnum},
     prelude::{Gd, Object},
     sys::VariantType,

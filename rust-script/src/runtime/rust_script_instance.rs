@@ -7,16 +7,14 @@
 use core::panic;
 use std::{collections::HashMap, fmt::Debug, ops::DerefMut};
 
-use godot::{
-    builtin::meta::{MethodInfo, PropertyInfo},
-    engine::{Script, ScriptInstance, SiMut},
-    prelude::{GString, Gd, Object, StringName, Variant, VariantType},
-};
+use godot::classes::Script;
+use godot::meta::{MethodInfo, PropertyInfo};
+use godot::obj::script::{ScriptInstance, SiMut};
+use godot::prelude::{GString, Gd, Object, StringName, Variant, VariantType};
 use godot_cell::blocking::GdCell;
 
-use crate::script_registry::GodotScriptObject;
-
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
+use crate::script_registry::GodotScriptObject;
 
 fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
     let rs = script.bind();
@@ -205,7 +203,7 @@ impl ScriptInstance for RustScriptInstance {
             .collect()
     }
 
-    fn get_language(&self) -> Gd<godot::engine::ScriptLanguage> {
+    fn get_language(&self) -> Gd<godot::classes::ScriptLanguage> {
         RustScriptLanguage::singleton()
             .map(Gd::upcast)
             .expect("RustScriptLanguage singleton is not initialized")
@@ -320,7 +318,7 @@ impl ScriptInstance for RustScriptPlaceholder {
             .collect()
     }
 
-    fn get_language(&self) -> Gd<godot::engine::ScriptLanguage> {
+    fn get_language(&self) -> Gd<godot::classes::ScriptLanguage> {
         RustScriptLanguage::singleton()
             .map(Gd::upcast)
             .expect("RustScriptLanguage singleton is not initialized")

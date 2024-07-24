@@ -6,21 +6,17 @@
 
 use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
-use godot::{
-    builtin::{
-        meta::{MethodInfo, PropertyInfo, ToGodot},
-        Callable,
-    },
-    engine::{
-        create_script_instance, notify::ObjectNotification, object::ConnectFlags, ClassDb, Engine,
-        IScriptExtension, Script, ScriptExtension, ScriptLanguage, WeakRef,
-    },
-    log::{godot_error, godot_print, godot_warn},
-    obj::{EngineEnum, InstanceId, WithBaseField},
-    prelude::{
-        godot_api, Array, Base, Dictionary, GString, Gd, GodotClass, Object, StringName, Variant,
-        VariantArray,
-    },
+use godot::classes::{
+    notify::ObjectNotification, object::ConnectFlags, ClassDb, Engine, IScriptExtension, Object,
+    Script, ScriptExtension, ScriptLanguage, WeakRef,
+};
+use godot::global::{godot_error, godot_print, godot_warn};
+use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
+use godot::obj::script::create_script_instance;
+use godot::obj::{EngineEnum, InstanceId, WithBaseField};
+use godot::prelude::{
+    godot_api, Array, Base, Callable, Dictionary, GString, Gd, GodotClass, StringName, Variant,
+    VariantArray,
 };
 
 use crate::{apply::Apply, script_registry::GodotScriptObject};
@@ -119,7 +115,7 @@ impl RustScript {
                 let result: Option<Gd<Object>> = Gd::try_from_instance_id(id).ok();
                 result
             })
-            .map(|gd_ref| godot::engine::utilities::weakref(gd_ref.to_variant()).to())
+            .map(|gd_ref| godot::global::weakref(gd_ref.to_variant()).to())
             .collect();
     }
 
@@ -198,7 +194,7 @@ impl IScriptExtension for RustScript {
     unsafe fn instance_create(&self, mut for_object: Gd<Object>) -> *mut c_void {
         self.owners
             .borrow_mut()
-            .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
+            .push(godot::global::weakref(for_object.to_variant()).to());
 
         let data = self.create_remote_instance(for_object.clone());
         let instance = RustScriptInstance::new(data, for_object.clone(), self.to_gd());
@@ -220,7 +216,7 @@ impl IScriptExtension for RustScript {
     unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
         self.owners
             .borrow_mut()
-            .push(godot::engine::utilities::weakref(for_object.to_variant()).to());
+            .push(godot::global::weakref(for_object.to_variant()).to());
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
@@ -396,7 +392,7 @@ impl IScriptExtension for RustScript {
     }
 
     // godot script reload hook
-    fn reload(&mut self, _keep_state: bool) -> godot::engine::global::Error {
+    fn reload(&mut self, _keep_state: bool) -> godot::global::Error {
         let owners = self.owners.borrow().clone();
 
         owners.iter().for_each(|owner| {
@@ -417,7 +413,7 @@ impl IScriptExtension for RustScript {
             })
         });
 
-        godot::engine::global::Error::OK
+        godot::global::Error::OK
     }
 
     fn on_notification(&mut self, what: ObjectNotification) {

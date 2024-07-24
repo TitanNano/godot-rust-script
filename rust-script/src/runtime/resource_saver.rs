@@ -4,11 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use godot::classes::{
+    file_access, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script,
+};
 use godot::global;
-use godot::{
-    engine::{file_access, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script},
-    obj::EngineBitfield,
-    prelude::{godot_api, godot_print, GString, Gd, GodotClass, PackedStringArray, Resource},
+use godot::obj::EngineBitfield;
+use godot::prelude::{
+    godot_api, godot_print, GString, Gd, GodotClass, PackedStringArray, Resource,
 };
 
 use super::rust_script::RustScript;

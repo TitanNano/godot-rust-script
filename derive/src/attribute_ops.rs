@@ -35,7 +35,7 @@ pub struct FieldExportOps {
 impl FieldExportOps {
     pub fn hint(&self, span: Span) -> Result<(TokenStream, String), TokenStream> {
         let godot_types = godot_types();
-        let property_hints = quote!(#godot_types::engine::global::PropertyHint);
+        let property_hints = quote!(#godot_types::global::PropertyHint);
         let mut result: Option<(&str, TokenStream, String)> = None;
 
         if self.color_no_alpha {

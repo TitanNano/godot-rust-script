@@ -4,10 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::{
-    builtin::meta::ToGodot,
-    obj::{Gd, GodotClass, Inherits, WithBaseField},
-};
+use godot::meta::ToGodot;
+use godot::obj::{Gd, GodotClass, Inherits, WithBaseField};
 
 pub trait DowngradeSelf: GodotClass {
     fn downgrade_gd<F: FnOnce(Gd<Self>) -> R, R>(&mut self, closure: F) -> R;

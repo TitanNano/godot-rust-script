@@ -14,13 +14,11 @@ mod rust_script_language;
 
 use std::{collections::HashMap, sync::RwLock};
 
-use godot::{
-    engine::{Engine, RefCounted, ResourceLoader, ResourceSaver, ScriptLanguage},
-    log::godot_warn,
-    obj::GodotClass,
-    prelude::{godot_print, Gd},
-    register::GodotClass,
-};
+use godot::classes::{Engine, RefCounted, ResourceLoader, ResourceSaver, ScriptLanguage};
+use godot::global::godot_warn;
+use godot::obj::GodotClass;
+use godot::prelude::{godot_print, Gd};
+use godot::register::GodotClass;
 use once_cell::sync::Lazy;
 
 use crate::{

@@ -5,7 +5,7 @@
  */
 
 use godot::builtin::{GString, StringName};
-use godot::engine::Node;
+use godot::classes::Node;
 use godot::obj::Gd;
 use godot_rust_script::{godot_script_impl, Context, GodotScript};
 

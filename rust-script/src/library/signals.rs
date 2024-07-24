@@ -6,18 +6,15 @@
 
 use std::marker::PhantomData;
 
-use super::RustScriptPropDesc;
-use godot::{
-    builtin::{
-        meta::{GodotConvert, GodotType, ToGodot},
-        Callable, Dictionary, GString, NodePath, StringName, Variant, Vector2, Vector3,
-    },
-    engine::{
-        global::{Error, PropertyHint},
-        Object,
-    },
-    obj::Gd,
+use godot::builtin::{
+    Callable, Dictionary, GString, NodePath, StringName, Variant, Vector2, Vector3,
 };
+use godot::classes::Object;
+use godot::global::{Error, PropertyHint};
+use godot::meta::{GodotConvert, GodotType, ToGodot};
+use godot::obj::Gd;
+
+use super::RustScriptPropDesc;
 
 pub trait ScriptSignal {
     type Args: SignalArguments;

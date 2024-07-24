@@ -6,16 +6,11 @@
 
 use std::{any::Any, collections::HashMap, fmt::Debug, sync::Arc};
 
-use godot::{
-    builtin::{
-        meta::{ClassName, MethodInfo, PropertyInfo},
-        GString,
-    },
-    engine::global::{MethodFlags, PropertyHint, PropertyUsageFlags},
-    obj::{EngineBitfield, EngineEnum},
-    prelude::{Gd, Object, StringName, Variant},
-    sys::VariantType,
-};
+use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
+use godot::meta::{ClassName, MethodInfo, PropertyInfo};
+use godot::obj::{EngineBitfield, EngineEnum};
+use godot::prelude::{GString, Gd, Object, StringName, Variant};
+use godot::sys::VariantType;
 
 use crate::Context;
 

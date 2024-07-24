@@ -14,7 +14,7 @@ pub fn godot_types() -> TokenStream {
 pub fn property_hints() -> TokenStream {
     let godot_types = godot_types();
 
-    quote!(#godot_types::engine::global::PropertyHint)
+    quote!(#godot_types::global::PropertyHint)
 }
 
 pub fn variant_ty() -> TokenStream {

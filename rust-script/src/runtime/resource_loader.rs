@@ -4,15 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::{
-    engine::{
-        file_access, ClassDb, FileAccess, IResourceFormatLoader, IScriptLanguageExtension, Script,
-    },
-    log::godot_print,
-    obj::Base,
-    prelude::{
-        godot_api, GString, Gd, GodotClass, PackedStringArray, StringName, ToGodot, Variant,
-    },
+use godot::classes::{
+    file_access, ClassDb, FileAccess, IResourceFormatLoader, IScriptLanguageExtension, Script,
+};
+use godot::global::godot_print;
+use godot::obj::Base;
+use godot::prelude::{
+    godot_api, GString, Gd, GodotClass, PackedStringArray, StringName, ToGodot, Variant,
 };
 
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage};

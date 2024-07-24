@@ -6,12 +6,10 @@
 
 use std::ops::Deref;
 
-use godot::{
-    builtin::meta::{MethodInfo, PropertyInfo},
-    obj::{EngineBitfield, EngineEnum},
-    prelude::{Array, Dictionary},
-    sys::VariantType,
-};
+use godot::meta::{MethodInfo, PropertyInfo};
+use godot::obj::{EngineBitfield, EngineEnum};
+use godot::prelude::{Array, Dictionary};
+use godot::sys::VariantType;
 
 use crate::apply::Apply;
 
