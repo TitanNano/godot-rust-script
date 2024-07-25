@@ -172,7 +172,7 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
             ty.span() => {
                 use #godot_types::sys::GodotFfi;
 
-                <#path as #godot_types::builtin::meta::GodotType>::Ffi::variant_type()
+                <#path as #godot_types::meta::GodotType>::Ffi::variant_type()
             }
         }),
         T::Verbatim(_) => Err(syn::Error::new(
@@ -193,7 +193,7 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
                 tuple.span() => {
                     use #godot_types::sys::GodotFfi;
 
-                    <#tuple as #godot_types::builtin::meta::GodotType>::Ffi::variant_type()
+                    <#tuple as #godot_types::meta::GodotType>::Ffi::variant_type()
                 }
             })
         }

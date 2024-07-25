@@ -6,13 +6,10 @@
 
 use std::ffi::OsStr;
 
-use godot::{
-    engine::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script},
-    obj::Base,
-    prelude::{
-        godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray,
-        VariantArray,
-    },
+use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
+use godot::obj::Base;
+use godot::prelude::{
+    godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray, VariantArray,
 };
 use itertools::Itertools;
 
