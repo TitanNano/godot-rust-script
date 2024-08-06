@@ -151,8 +151,10 @@ pub fn godot_script_impl(
     let trait_impl = quote_spanned! {
         current_type.span() =>
         impl ::godot_rust_script::GodotScriptImpl for #current_type {
+            type ImplBase = <Self as GodotScript>::Base;
+
             #[allow(unused_variables)]
-            fn call_fn(&mut self, name: #string_name_ty, args: &[&#variant_ty], ctx: ::godot_rust_script::Context) -> ::std::result::Result<#variant_ty, #call_error_ty> {
+            fn call_fn(&mut self, name: #string_name_ty, args: &[&#variant_ty], ctx: ::godot_rust_script::Context<Self>) -> ::std::result::Result<#variant_ty, #call_error_ty> {
                 match name.to_string().as_str() {
                     #method_dispatch
 

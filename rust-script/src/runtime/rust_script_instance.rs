@@ -5,16 +5,18 @@
  */
 
 use core::panic;
+use std::marker::PhantomData;
 use std::{collections::HashMap, fmt::Debug, ops::DerefMut};
 
 use godot::classes::Script;
 use godot::meta::{MethodInfo, PropertyInfo};
-use godot::obj::script::{ScriptInstance, SiMut};
+use godot::obj::script::{ScriptBaseMut, ScriptInstance, SiMut};
+use godot::obj::GodotClass;
 use godot::prelude::{GString, Gd, Object, StringName, Variant, VariantType};
 use godot_cell::blocking::GdCell;
 
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
-use crate::script_registry::GodotScriptObject;
+use crate::script_registry::{GodotScriptImpl, GodotScriptObject};
 
 fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
     let rs = script.bind();
@@ -48,30 +50,45 @@ fn script_property_list(script: &Gd<RustScript>) -> Box<[PropertyInfo]> {
     props
 }
 
-pub struct Context<'a> {
-    cell: &'a GdCell<Box<dyn GodotScriptObject>>,
+pub struct GenericContext<'a> {
+    cell: *const GdCell<Box<dyn GodotScriptObject>>,
     data_ptr: *mut Box<dyn GodotScriptObject>,
+    base: ScriptBaseMut<'a, RustScriptInstance>,
 }
 
-impl<'a> Debug for Context<'a> {
+impl<'a> GenericContext<'a> {
+    unsafe fn new(
+        cell: *const GdCell<Box<dyn GodotScriptObject>>,
+        data_ptr: *mut Box<dyn GodotScriptObject>,
+        base: ScriptBaseMut<'a, RustScriptInstance>,
+    ) -> Self {
+        Self {
+            cell,
+            data_ptr,
+            base,
+        }
+    }
+}
+
+pub struct Context<'a, Script: GodotScriptImpl + ?Sized> {
+    cell: *const GdCell<Box<dyn GodotScriptObject>>,
+    data_ptr: *mut Box<dyn GodotScriptObject>,
+    base: ScriptBaseMut<'a, RustScriptInstance>,
+    base_type: PhantomData<Script>,
+}
+
+impl<'a, Script: GodotScriptImpl> Debug for Context<'a, Script> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Context { <Call Context> }")
     }
 }
 
-impl<'a> Context<'a> {
-    unsafe fn new(
-        cell: &'a GdCell<Box<dyn GodotScriptObject>>,
-        data_ptr: *mut Box<dyn GodotScriptObject>,
-    ) -> Self {
-        Self { cell, data_ptr }
-    }
-
-    pub fn reentrant_scope<T: GodotScriptObject + 'static, R>(
+impl<'a, Script: GodotScriptImpl> Context<'a, Script> {
+    pub fn reentrant_scope<T: GodotScriptObject + 'static, Args, Return>(
         &mut self,
         self_ref: &mut T,
-        cb: impl FnOnce() -> R,
-    ) -> R {
+        scope: impl ReentrantScope<Script::ImplBase, Args, Return>,
+    ) -> Return {
         let known_ptr = unsafe {
             let any = (*self.data_ptr).as_any_mut();
 
@@ -84,16 +101,48 @@ impl<'a> Context<'a> {
             panic!("unable to create reentrant scope with unrelated self reference!");
         }
 
-        let guard = self
-            .cell
-            .make_inaccessible(unsafe { &mut *self.data_ptr })
-            .unwrap();
+        let current_ref = unsafe { &mut *self.data_ptr };
+        let cell = unsafe { &*self.cell };
+        let guard = cell.make_inaccessible(current_ref).unwrap();
 
-        let result = cb();
+        let result = scope.run(self.base.deref_mut().clone().cast::<Script::ImplBase>());
 
         drop(guard);
 
         result
+    }
+}
+
+impl<'a, Script: GodotScriptImpl> From<GenericContext<'a>> for Context<'a, Script> {
+    fn from(value: GenericContext<'a>) -> Self {
+        let GenericContext {
+            cell,
+            data_ptr,
+            base,
+        } = value;
+
+        Self {
+            cell,
+            data_ptr,
+            base,
+            base_type: PhantomData,
+        }
+    }
+}
+
+pub trait ReentrantScope<Base: GodotClass, Args, Return> {
+    fn run(self, base: Gd<Base>) -> Return;
+}
+
+impl<Base: GodotClass, F: FnOnce() -> R, R> ReentrantScope<Base, (), R> for F {
+    fn run(self, _base: Gd<Base>) -> R {
+        self()
+    }
+}
+
+impl<Base: GodotClass, F: FnOnce(Gd<Base>) -> R, R> ReentrantScope<Base, Gd<Base>, R> for F {
+    fn run(self, base: Gd<Base>) -> R {
+        self(base)
     }
 }
 
@@ -151,16 +200,19 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn call(
-        this: SiMut<Self>,
+        mut this: SiMut<Self>,
         method: StringName,
         args: &[&Variant],
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        let cell = &this.data;
-        let mut data_guard = cell.borrow_mut().unwrap();
+        let cell: *const _ = &this.data;
+
+        let base = this.base_mut();
+
+        let mut data_guard = unsafe { &*cell }.borrow_mut().unwrap();
         let data = data_guard.deref_mut();
         let data_ptr = data as *mut _;
 
-        let context = unsafe { Context::new(cell, data_ptr) };
+        let context = unsafe { GenericContext::new(cell, data_ptr, base) };
 
         data.call(method, args, context)
     }
