@@ -8,20 +8,22 @@ use std::{any::Any, collections::HashMap, fmt::Debug, sync::Arc};
 
 use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
 use godot::meta::{ClassName, MethodInfo, PropertyInfo};
-use godot::obj::{EngineBitfield, EngineEnum};
+use godot::obj::{EngineBitfield, EngineEnum, Inherits};
 use godot::prelude::{GString, Gd, Object, StringName, Variant};
 use godot::sys::VariantType;
 
-use crate::Context;
+use crate::runtime::{Context, GenericContext};
 
-pub trait GodotScript: Debug + GodotScriptImpl {
+pub trait GodotScript: Debug + GodotScriptImpl<ImplBase = Self::Base> {
+    type Base: Inherits<Object>;
+
     fn set(&mut self, name: StringName, value: Variant) -> bool;
     fn get(&self, name: StringName) -> Option<Variant>;
     fn call(
         &mut self,
         method: StringName,
         args: &[&Variant],
-        context: Context,
+        context: Context<'_, Self>,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
 
     fn to_string(&self) -> String;
@@ -31,11 +33,13 @@ pub trait GodotScript: Debug + GodotScriptImpl {
 }
 
 pub trait GodotScriptImpl {
+    type ImplBase: Inherits<Object>;
+
     fn call_fn(
         &mut self,
         name: StringName,
         args: &[&Variant],
-        context: Context,
+        context: Context<Self>,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
 }
 
@@ -46,7 +50,7 @@ pub trait GodotScriptObject {
         &mut self,
         method: StringName,
         args: &[&Variant],
-        context: Context,
+        context: GenericContext,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
     fn to_string(&self) -> String;
     fn property_state(&self) -> HashMap<StringName, Variant>;
@@ -67,9 +71,9 @@ impl<T: GodotScript + 'static> GodotScriptObject for T {
         &mut self,
         method: StringName,
         args: &[&Variant],
-        context: Context,
+        context: GenericContext,
     ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        GodotScript::call(self, method, args, context)
+        GodotScript::call(self, method, args, Context::from(context))
     }
 
     fn to_string(&self) -> String {

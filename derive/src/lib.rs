@@ -128,11 +128,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     
     let output = quote! {
         impl ::godot_rust_script::GodotScript for #script_type_ident {
+            type Base = #base_class;
+            
             #get_fields_impl
 
             #set_fields_impl
 
-            fn call(&mut self, name: #string_name_ty, args: &[&#variant_ty], ctx: ::godot_rust_script::Context) -> ::std::result::Result<#variant_ty, #call_error_ty> {
+            fn call(&mut self, name: #string_name_ty, args: &[&#variant_ty], ctx: ::godot_rust_script::Context<Self>) -> ::std::result::Result<#variant_ty, #call_error_ty> {
                 ::godot_rust_script::GodotScriptImpl::call_fn(self, name, args, ctx)
             }
 

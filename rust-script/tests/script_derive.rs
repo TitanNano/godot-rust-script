@@ -6,7 +6,7 @@
 
 use godot::builtin::{GString, StringName};
 use godot::classes::Node;
-use godot::obj::Gd;
+use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{godot_script_impl, Context, GodotScript};
 
 #[derive(GodotScript, Debug)]
@@ -19,7 +19,7 @@ struct TestScript {
     #[export(enum_options = ["inactive", "water", "teargas"])]
     pub enum_prop: u8,
 
-    base: Gd<Node>,
+    base: Gd<<Self as GodotScript>::Base>,
 }
 
 #[godot_script_impl]
@@ -28,12 +28,16 @@ impl TestScript {
         value > 2
     }
 
-    pub fn action(&mut self, input: GString, mut ctx: Context) -> bool {
+    pub fn action(&mut self, input: GString, mut ctx: Context<Self>) -> bool {
         let result = input.len() > 2;
         let mut base = self.base.clone();
 
         ctx.reentrant_scope(self, || {
             base.emit_signal(StringName::from("hit"), &[]);
+        });
+
+        ctx.reentrant_scope(self, |mut base: Gd<Node>| {
+            base.set_owner(Node::new_alloc());
         });
 
         result
