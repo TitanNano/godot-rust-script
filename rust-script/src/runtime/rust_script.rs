@@ -33,7 +33,7 @@ const NOTIFICATION_EXTENSION_RELOADED: i32 = 2;
 
 #[derive(GodotClass)]
 #[class(base = ScriptExtension, tool)]
-pub(super) struct RustScript {
+pub(crate) struct RustScript {
     #[var(get = get_class_name, set = set_class_name, usage_flags = [STORAGE])]
     class_name: GString,
 

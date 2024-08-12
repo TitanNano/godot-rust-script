@@ -13,11 +13,11 @@ use godot::{
     sys::VariantType,
 };
 
+pub use crate::script_registry::{
+    CastToScript, GodotScript, GodotScriptImpl, RsRef, RustScriptMetaData, RustScriptMethodInfo,
+};
 use crate::script_registry::{
     CreateScriptInstanceData, GodotScriptObject, RustScriptPropertyInfo, RustScriptSignalInfo,
-};
-pub use crate::script_registry::{
-    GodotScript, GodotScriptImpl, RustScriptMetaData, RustScriptMethodInfo,
 };
 pub use signals::{ScriptSignal, Signal, SignalArguments};
 
