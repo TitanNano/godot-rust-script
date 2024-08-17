@@ -34,6 +34,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         .unwrap_or_else(|| quote!(::godot_rust_script::godot::prelude::RefCounted));
 
     let script_type_ident = opts.ident;
+    let class_name = script_type_ident.to_string();
     let fields = opts.data.take_struct().unwrap().fields;
 
     let public_fields = fields.iter().filter(|field| {
@@ -129,6 +130,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let output = quote! {
         impl ::godot_rust_script::GodotScript for #script_type_ident {
             type Base = #base_class;
+
+            const CLASS_NAME: &'static str = #class_name;
             
             #get_fields_impl
 
@@ -382,4 +385,8 @@ pub fn godot_script_impl(
     body: proc_macro::TokenStream,
 ) -> proc_macro::TokenStream {
     impl_attribute::godot_script_impl(args, body)
+}
+
+fn compile_error(message: &str, tokens: impl ToTokens) -> TokenStream {
+    syn::Error::new_spanned(tokens, message).into_compile_error()
 }

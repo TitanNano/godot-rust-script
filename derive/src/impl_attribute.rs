@@ -6,10 +6,13 @@
 
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, spanned::Spanned, FnArg, ImplItem, ItemImpl, ReturnType, Type};
+use syn::{
+    parse2, parse_macro_input, spanned::Spanned, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl,
+    PatIdent, PatType, ReturnType, Token, Type, Visibility,
+};
 
 use crate::{
-    is_context_type, rust_to_variant_type,
+    compile_error, is_context_type, rust_to_variant_type,
     type_paths::{godot_types, property_hints, string_name_ty, variant_ty},
 };
 
@@ -173,12 +176,166 @@ pub fn godot_script_impl(
         );
     };
 
+    let pub_interface = generate_public_interface(&body);
+
     quote! {
         #body
 
         #trait_impl
 
+        #pub_interface
+
         #metadata
     }
     .into()
+}
+
+fn extract_script_name_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream> {
+    match impl_target {
+        Type::Array(_) => Err(compile_error("Arrays are not supported!", impl_target)),
+        Type::BareFn(_) => Err(compile_error(
+            "Bare functions are not supported!",
+            impl_target,
+        )),
+        Type::Group(_) => Err(compile_error("Groups are not supported!", impl_target)),
+        Type::ImplTrait(_) => Err(compile_error("Impl traits are not suppored!", impl_target)),
+        Type::Infer(_) => Err(compile_error("Infer is not supported!", impl_target)),
+        Type::Macro(_) => Err(compile_error("Macro types are not supported!", impl_target)),
+        Type::Never(_) => Err(compile_error("Never type is not supported!", impl_target)),
+        Type::Paren(_) => Err(compile_error("Unsupported type!", impl_target)),
+        Type::Path(ref path) => Ok(path.path.segments.last().unwrap().ident.clone()),
+        Type::Ptr(_) => Err(compile_error(
+            "Pointer types are not supported!",
+            impl_target,
+        )),
+        Type::Reference(_) => Err(compile_error("References are not supported!", impl_target)),
+        Type::Slice(_) => Err(compile_error("Slices are not supported!", impl_target)),
+        Type::TraitObject(_) => Err(compile_error(
+            "Trait objects are not supported!",
+            impl_target,
+        )),
+        Type::Tuple(_) => Err(compile_error("Tuples are not supported!", impl_target)),
+        Type::Verbatim(_) => Err(compile_error("Verbatim is not supported!", impl_target)),
+        _ => Err(compile_error("Unsupported type!", impl_target)),
+    }
+}
+
+fn sanitize_trait_fn_arg(arg: FnArg) -> FnArg {
+    match arg {
+        FnArg::Receiver(mut rec) => {
+            rec.mutability = Some(Token![mut](rec.span()));
+            rec.ty = parse2(quote!(&mut Self)).unwrap();
+
+            FnArg::Receiver(rec)
+        }
+        FnArg::Typed(ty) => FnArg::Typed(PatType {
+            attrs: ty.attrs,
+            pat: match *ty.pat {
+                syn::Pat::Const(_)
+                | syn::Pat::Lit(_)
+                | syn::Pat::Macro(_)
+                | syn::Pat::Or(_)
+                | syn::Pat::Paren(_)
+                | syn::Pat::Path(_)
+                | syn::Pat::Range(_)
+                | syn::Pat::Reference(_)
+                | syn::Pat::Rest(_)
+                | syn::Pat::Slice(_)
+                | syn::Pat::Struct(_)
+                | syn::Pat::Tuple(_)
+                | syn::Pat::TupleStruct(_)
+                | syn::Pat::Type(_)
+                | syn::Pat::Verbatim(_)
+                | syn::Pat::Wild(_) => ty.pat,
+                syn::Pat::Ident(ident_pat) => Box::new(syn::Pat::Ident(PatIdent {
+                    attrs: ident_pat.attrs,
+                    by_ref: None,
+                    mutability: None,
+                    ident: ident_pat.ident,
+                    subpat: None,
+                })),
+                _ => ty.pat,
+            },
+            colon_token: ty.colon_token,
+            ty: ty.ty,
+        }),
+    }
+}
+
+fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
+    let impl_target = impl_body.self_ty.as_ref();
+    let script_name = match extract_script_name_from_type(impl_target) {
+        Ok(target) => target,
+        Err(err) => return err,
+    };
+
+    let trait_name = Ident::new(&format!("I{}", script_name), script_name.span());
+
+    let functions: Vec<_> = impl_body
+        .items
+        .iter()
+        .filter_map(|func| match func {
+            ImplItem::Fn(func @ ImplItemFn{ vis: Visibility::Public(_), .. })  => Some(func),
+            _ => None,
+        })
+        .map(|func| {
+            let mut sig = func.sig.clone();
+
+            sig.inputs = sig
+                .inputs
+                .into_iter()
+                .filter(|arg| {
+                    !matches!(arg, FnArg::Typed(PatType { attrs: _, pat: _, colon_token: _, ty }) if matches!(ty.as_ref(), Type::Path(path) if path.path.segments.last().unwrap().ident == "Context"))
+                })
+                .map(sanitize_trait_fn_arg)
+                .collect();
+            sig
+        })
+        .collect();
+
+    let function_defs: TokenStream = functions
+        .iter()
+        .map(|func| quote_spanned! { func.span() =>  #func; })
+        .collect();
+    let function_impls: TokenStream = functions
+        .iter()
+        .map(|func| {
+            let func_name = func.ident.to_string();
+            let args: TokenStream = func
+                .inputs
+                .iter()
+                .filter_map(|arg| match arg {
+                    FnArg::Receiver(_) => None,
+                    FnArg::Typed(arg) => Some(arg),
+                })
+                .map(|arg| {
+                    let pat = arg.pat.clone();
+
+                    quote_spanned! { pat.span() =>
+                         ::godot::meta::ToGodot::to_variant(&#pat),
+                    }
+                })
+                .collect();
+
+            quote_spanned! { func.span() =>
+                #func {
+                    (*self).call(#func_name.into(), &[#args]).to()
+                }
+            }
+        })
+        .collect();
+
+    quote! {
+        #[automatically_derived]
+        #[allow(dead_code)]
+        pub trait #trait_name {
+            #function_defs
+        }
+
+        #[automatically_derived]
+        #[allow(dead_code)]
+        impl #trait_name for ::godot_rust_script::RsRef<#impl_target> {
+            #function_impls
+        }
+    }
 }

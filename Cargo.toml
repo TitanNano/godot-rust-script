@@ -19,6 +19,7 @@ proc-macro2 = "1.0.68"
 quote = "1.0.33"
 syn = "2.0.38"
 const-str = "0.5.6"
+thiserror = "1"
 
 godot-rust-script-derive = { path = "derive" }
 tests-scripts-lib = { path = "tests-scripts-lib" }

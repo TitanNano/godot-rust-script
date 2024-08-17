@@ -29,6 +29,7 @@ use crate::{
 
 use self::rust_script_language::RustScriptLanguage;
 
+pub(crate) use rust_script::RustScript;
 pub use rust_script_instance::{Context, GenericContext};
 
 #[macro_export]

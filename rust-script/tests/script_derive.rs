@@ -24,6 +24,8 @@ struct TestScript {
 
 #[godot_script_impl]
 impl TestScript {
+    pub fn _init(&self) {}
+
     pub fn record(&mut self, value: u8) -> bool {
         value > 2
     }
