@@ -14,7 +14,7 @@ use godot::global::{Error, PropertyHint};
 use godot::meta::{GodotConvert, GodotType, ToGodot};
 use godot::obj::Gd;
 
-use super::RustScriptPropDesc;
+use crate::static_script_registry::RustScriptPropDesc;
 
 pub trait ScriptSignal {
     type Args: SignalArguments;

@@ -4,19 +4,19 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use core::panic;
-use std::marker::PhantomData;
-use std::{collections::HashMap, fmt::Debug, ops::DerefMut};
+use std::any::Any;
+use std::{collections::HashMap, ops::DerefMut};
 
 use godot::classes::Script;
 use godot::meta::{MethodInfo, PropertyInfo};
-use godot::obj::script::{ScriptBaseMut, ScriptInstance, SiMut};
-use godot::obj::GodotClass;
+use godot::obj::script::{ScriptInstance, SiMut};
 use godot::prelude::{GString, Gd, Object, StringName, Variant, VariantType};
 use godot_cell::blocking::GdCell;
 
+use super::call_context::GenericContext;
+use super::Context;
 use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
-use crate::script_registry::{GodotScriptImpl, GodotScriptObject};
+use crate::GodotScript;
 
 fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
     let rs = script.bind();
@@ -50,103 +50,53 @@ fn script_property_list(script: &Gd<RustScript>) -> Box<[PropertyInfo]> {
     props
 }
 
-pub struct GenericContext<'a> {
-    cell: *const GdCell<Box<dyn GodotScriptObject>>,
-    data_ptr: *mut Box<dyn GodotScriptObject>,
-    base: ScriptBaseMut<'a, RustScriptInstance>,
-}
-
-impl<'a> GenericContext<'a> {
-    unsafe fn new(
-        cell: *const GdCell<Box<dyn GodotScriptObject>>,
-        data_ptr: *mut Box<dyn GodotScriptObject>,
-        base: ScriptBaseMut<'a, RustScriptInstance>,
-    ) -> Self {
-        Self {
-            cell,
-            data_ptr,
-            base,
-        }
-    }
-}
-
-pub struct Context<'a, Script: GodotScriptImpl + ?Sized> {
-    cell: *const GdCell<Box<dyn GodotScriptObject>>,
-    data_ptr: *mut Box<dyn GodotScriptObject>,
-    base: ScriptBaseMut<'a, RustScriptInstance>,
-    base_type: PhantomData<Script>,
-}
-
-impl<'a, Script: GodotScriptImpl> Debug for Context<'a, Script> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("Context { <Call Context> }")
-    }
-}
-
-impl<'a, Script: GodotScriptImpl> Context<'a, Script> {
-    pub fn reentrant_scope<T: GodotScriptObject + 'static, Args, Return>(
+pub trait GodotScriptObject {
+    fn set(&mut self, name: StringName, value: Variant) -> bool;
+    fn get(&self, name: StringName) -> Option<Variant>;
+    fn call(
         &mut self,
-        self_ref: &mut T,
-        scope: impl ReentrantScope<Script::ImplBase, Args, Return>,
-    ) -> Return {
-        let known_ptr = unsafe {
-            let any = (*self.data_ptr).as_any_mut();
+        method: StringName,
+        args: &[&Variant],
+        context: GenericContext,
+    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
+    fn to_string(&self) -> String;
+    fn property_state(&self) -> HashMap<StringName, Variant>;
 
-            any.downcast_mut::<T>().unwrap() as *mut T
-        };
+    fn as_any_mut(&mut self) -> &mut dyn Any;
+}
 
-        let self_ptr = self_ref as *mut _;
+impl<T: GodotScript + 'static> GodotScriptObject for T {
+    fn set(&mut self, name: StringName, value: Variant) -> bool {
+        GodotScript::set(self, name, value)
+    }
 
-        if known_ptr != self_ptr {
-            panic!("unable to create reentrant scope with unrelated self reference!");
-        }
+    fn get(&self, name: StringName) -> Option<Variant> {
+        GodotScript::get(self, name)
+    }
 
-        let current_ref = unsafe { &mut *self.data_ptr };
-        let cell = unsafe { &*self.cell };
-        let guard = cell.make_inaccessible(current_ref).unwrap();
+    fn call(
+        &mut self,
+        method: StringName,
+        args: &[&Variant],
+        context: GenericContext,
+    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
+        GodotScript::call(self, method, args, Context::from(context))
+    }
 
-        let result = scope.run(self.base.deref_mut().clone().cast::<Script::ImplBase>());
+    fn to_string(&self) -> String {
+        GodotScript::to_string(self)
+    }
 
-        drop(guard);
+    fn property_state(&self) -> HashMap<StringName, Variant> {
+        GodotScript::property_state(self)
+    }
 
-        result
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }
 
-impl<'a, Script: GodotScriptImpl> From<GenericContext<'a>> for Context<'a, Script> {
-    fn from(value: GenericContext<'a>) -> Self {
-        let GenericContext {
-            cell,
-            data_ptr,
-            base,
-        } = value;
-
-        Self {
-            cell,
-            data_ptr,
-            base,
-            base_type: PhantomData,
-        }
-    }
-}
-
-pub trait ReentrantScope<Base: GodotClass, Args, Return> {
-    fn run(self, base: Gd<Base>) -> Return;
-}
-
-impl<Base: GodotClass, F: FnOnce() -> R, R> ReentrantScope<Base, (), R> for F {
-    fn run(self, _base: Gd<Base>) -> R {
-        self()
-    }
-}
-
-impl<Base: GodotClass, F: FnOnce(Gd<Base>) -> R, R> ReentrantScope<Base, Gd<Base>, R> for F {
-    fn run(self, base: Gd<Base>) -> R {
-        self(base)
-    }
-}
-
-pub(super) struct RustScriptInstance {
+pub(crate) struct RustScriptInstance {
     data: GdCell<Box<dyn GodotScriptObject>>,
 
     script: Gd<RustScript>,

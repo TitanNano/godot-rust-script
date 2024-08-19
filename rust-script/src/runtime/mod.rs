@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+mod call_context;
 mod downgrade_self;
 mod metadata;
 mod resource_loader;
@@ -21,42 +22,16 @@ use godot::prelude::{godot_print, Gd};
 use godot::register::GodotClass;
 use once_cell::sync::Lazy;
 
-use crate::{
-    runtime::{resource_loader::RustScriptResourceLoader, resource_saver::RustScriptResourceSaver},
-    shared::RustScriptLibInit,
-    RustScriptMetaData,
+use crate::runtime::{
+    resource_loader::RustScriptResourceLoader, resource_saver::RustScriptResourceSaver,
 };
+use crate::static_script_registry::RustScriptMetaData;
 
 use self::rust_script_language::RustScriptLanguage;
 
+pub use call_context::Context;
 pub(crate) use rust_script::RustScript;
-pub use rust_script_instance::{Context, GenericContext};
-
-#[macro_export]
-macro_rules! setup {
-    ($lib_crate:tt) => {
-        mod scripts_lib {
-            pub use $lib_crate::{__godot_rust_script_init, __GODOT_RUST_SCRIPT_SRC_ROOT};
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! init {
-    ($scripts_module:tt) => {
-        $crate::RustScriptExtensionLayer::initialize(
-            $scripts_module::__godot_rust_script_init,
-            $scripts_module::__GODOT_RUST_SCRIPT_SRC_ROOT,
-        )
-    };
-}
-
-#[macro_export]
-macro_rules! deinit {
-    () => {
-        $crate::RustScriptExtensionLayer::deinitialize()
-    };
-}
+pub(crate) use rust_script_instance::GodotScriptObject;
 
 static SCRIPT_REGISTRY: Lazy<RwLock<HashMap<String, RustScriptMetaData>>> =
     Lazy::new(RwLock::default);
@@ -76,6 +51,10 @@ impl RefCountedSingleton {
         self.inner.clone()
     }
 }
+
+pub trait RustScriptLibInit: Fn() -> Vec<RustScriptMetaData> {}
+
+impl<F> RustScriptLibInit for F where F: Fn() -> Vec<RustScriptMetaData> {}
 
 pub struct RustScriptExtensionLayer;
 

@@ -7,7 +7,7 @@
 use godot::builtin::{GString, StringName};
 use godot::classes::Node;
 use godot::obj::{Gd, NewAlloc};
-use godot_rust_script::{godot_script_impl, Context, GodotScript};
+use godot_rust_script::{godot_script_impl, Context, GodotScript, Signal};
 
 #[derive(GodotScript, Debug)]
 #[script(base = Node)]
@@ -18,6 +18,9 @@ struct TestScript {
 
     #[export(enum_options = ["inactive", "water", "teargas"])]
     pub enum_prop: u8,
+
+    #[signal]
+    changed: Signal<(u8, u8)>,
 
     base: Gd<<Self as GodotScript>::Base>,
 }

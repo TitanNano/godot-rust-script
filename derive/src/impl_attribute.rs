@@ -69,7 +69,7 @@ pub fn godot_script_impl(
                         (
                             quote_spanned! {
                                 arg.span() =>
-                                ::godot_rust_script::RustScriptPropDesc {
+                                ::godot_rust_script::private_export::RustScriptPropDesc {
                                     name: stringify!(#arg_name),
                                     ty: #arg_type,
                                     exported: false,
@@ -126,10 +126,10 @@ pub fn godot_script_impl(
 
             let metadata = quote_spanned! {
                 fnc.span() =>
-                ::godot_rust_script::RustScriptMethodDesc {
+                ::godot_rust_script::private_export::RustScriptMethodDesc {
                     name: #fn_name_str,
                     arguments: Box::new([#args_meta]),
-                    return_type: ::godot_rust_script::RustScriptPropDesc {
+                    return_type: ::godot_rust_script::private_export::RustScriptPropDesc {
                         name: #fn_name_str,
                         ty: #fn_return_ty,
                         exported: false,

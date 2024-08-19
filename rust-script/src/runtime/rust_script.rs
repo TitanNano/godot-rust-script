@@ -19,8 +19,9 @@ use godot::prelude::{
     VariantArray,
 };
 
-use crate::{apply::Apply, script_registry::GodotScriptObject};
+use crate::apply::Apply;
 
+use super::rust_script_instance::GodotScriptObject;
 use super::{
     downgrade_self::DowngradeSelf,
     metadata::{Documented, ToDictionary, ToMethodDoc, ToPropertyDoc},
