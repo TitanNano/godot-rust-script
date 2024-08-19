@@ -12,7 +12,7 @@ use syn::{
 };
 
 use crate::{
-    compile_error, is_context_type, rust_to_variant_type,
+    extract_ident_from_type, is_context_type, rust_to_variant_type,
     type_paths::{godot_types, property_hints, string_name_ty, variant_ty},
 };
 
@@ -74,7 +74,7 @@ pub fn godot_script_impl(
                                     ty: #arg_type,
                                     exported: false,
                                     hint: #property_hints::NONE,
-                                    hint_string: "",
+                                    hint_string: String::new(),
                                     description: "",
                                 },
                             },
@@ -134,7 +134,7 @@ pub fn godot_script_impl(
                         ty: #fn_return_ty,
                         exported: false,
                         hint: #property_hints::NONE,
-                        hint_string: "",
+                        hint_string: String::new(),
                         description: "",
                     },
                     flags: #method_flag,
@@ -190,36 +190,6 @@ pub fn godot_script_impl(
     .into()
 }
 
-fn extract_script_name_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream> {
-    match impl_target {
-        Type::Array(_) => Err(compile_error("Arrays are not supported!", impl_target)),
-        Type::BareFn(_) => Err(compile_error(
-            "Bare functions are not supported!",
-            impl_target,
-        )),
-        Type::Group(_) => Err(compile_error("Groups are not supported!", impl_target)),
-        Type::ImplTrait(_) => Err(compile_error("Impl traits are not suppored!", impl_target)),
-        Type::Infer(_) => Err(compile_error("Infer is not supported!", impl_target)),
-        Type::Macro(_) => Err(compile_error("Macro types are not supported!", impl_target)),
-        Type::Never(_) => Err(compile_error("Never type is not supported!", impl_target)),
-        Type::Paren(_) => Err(compile_error("Unsupported type!", impl_target)),
-        Type::Path(ref path) => Ok(path.path.segments.last().unwrap().ident.clone()),
-        Type::Ptr(_) => Err(compile_error(
-            "Pointer types are not supported!",
-            impl_target,
-        )),
-        Type::Reference(_) => Err(compile_error("References are not supported!", impl_target)),
-        Type::Slice(_) => Err(compile_error("Slices are not supported!", impl_target)),
-        Type::TraitObject(_) => Err(compile_error(
-            "Trait objects are not supported!",
-            impl_target,
-        )),
-        Type::Tuple(_) => Err(compile_error("Tuples are not supported!", impl_target)),
-        Type::Verbatim(_) => Err(compile_error("Verbatim is not supported!", impl_target)),
-        _ => Err(compile_error("Unsupported type!", impl_target)),
-    }
-}
-
 fn sanitize_trait_fn_arg(arg: FnArg) -> FnArg {
     match arg {
         FnArg::Receiver(mut rec) => {
@@ -264,7 +234,7 @@ fn sanitize_trait_fn_arg(arg: FnArg) -> FnArg {
 
 fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
     let impl_target = impl_body.self_ty.as_ref();
-    let script_name = match extract_script_name_from_type(impl_target) {
+    let script_name = match extract_ident_from_type(impl_target) {
         Ok(target) => target,
         Err(err) => return err,
     };

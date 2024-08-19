@@ -4,84 +4,92 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use darling::{ast::Data, util, FromAttributes, FromDeriveInput, FromField, FromMeta};
+use darling::ast::Data;
+use darling::util::{self, WithOriginal};
+use darling::{FromAttributes, FromDeriveInput, FromField, FromMeta};
 use proc_macro2::{Span, TokenStream};
-use quote::quote;
+use quote::{quote, quote_spanned};
+use syn::spanned::Spanned;
+use syn::{LitStr, Meta, Type};
 
 use crate::type_paths::godot_types;
 
 #[derive(FromAttributes, Debug)]
 #[darling(attributes(export))]
 pub struct FieldExportOps {
-    #[darling(default)]
-    color_no_alpha: bool,
-    #[darling(default)]
-    dir: bool,
-    exp_easing: Option<syn::ExprArray>,
-    file: Option<syn::ExprArray>,
-    enum_options: Option<syn::ExprArray>,
-    flags: Option<syn::ExprArray>,
-    #[darling(default)]
-    global_dir: bool,
-    #[darling(default)]
-    global_file: bool,
-    #[darling(default)]
-    multiline: bool,
-    node_path: Option<syn::ExprArray>,
-    placeholder: Option<String>,
-    range: Option<ExportRangeOps>,
+    color_no_alpha: Option<WithOriginal<bool, Meta>>,
+    dir: Option<WithOriginal<bool, Meta>>,
+    exp_easing: Option<WithOriginal<syn::ExprArray, Meta>>,
+    file: Option<WithOriginal<syn::ExprArray, Meta>>,
+    enum_options: Option<WithOriginal<syn::ExprArray, Meta>>,
+    flags: Option<WithOriginal<syn::ExprArray, Meta>>,
+    global_dir: Option<WithOriginal<bool, Meta>>,
+    global_file: Option<WithOriginal<(), Meta>>,
+    multiline: Option<WithOriginal<(), Meta>>,
+    node_path: Option<WithOriginal<syn::ExprArray, Meta>>,
+    placeholder: Option<WithOriginal<String, Meta>>,
+    range: Option<WithOriginal<ExportRangeOps, Meta>>,
+    #[darling(rename = "ty")]
+    custom_type: Option<WithOriginal<LitStr, Meta>>,
 }
 
 impl FieldExportOps {
-    pub fn hint(&self, span: Span) -> Result<(TokenStream, String), TokenStream> {
+    pub fn hint(&self, ty: &Type) -> Result<(TokenStream, TokenStream), TokenStream> {
         let godot_types = godot_types();
         let property_hints = quote!(#godot_types::global::PropertyHint);
-        let mut result: Option<(&str, TokenStream, String)> = None;
 
-        if self.color_no_alpha {
+        let mut result: Option<(&str, TokenStream, TokenStream)> = None;
+
+        if let Some(color_no_alpha) = self.color_no_alpha.as_ref() {
             result = Some((
                 "color_no_alpha",
-                quote!(#property_hints::COLOR_NO_ALPHA),
-                String::new(),
+                quote_spanned!(color_no_alpha.original.span() => #property_hints::COLOR_NO_ALPHA),
+                quote_spanned!(color_no_alpha.original.span() => String::new()),
             ));
         }
 
-        if self.dir {
+        if let Some(dir) = self.dir.as_ref() {
             let field = "dir";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(dir.original.span(), active_field, field);
             }
 
-            result = Some((field, quote!(#property_hints::DIR), String::new()));
+            result = Some((
+                field,
+                quote_spanned!(dir.original.span() => Some(#property_hints::DIR)),
+                quote_spanned!(dir.original.span() => Some(String::new())),
+            ));
         }
 
         if let Some(exp_list) = self.exp_easing.as_ref() {
             let field = "exp_easing";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(exp_list.original.span(), active_field, field);
             }
 
             let parsed_params = exp_list
+                .parsed
                 .elems
                 .iter()
                 .map(ExpEasingOpts::from_expr)
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(|err| err.write_errors())?;
 
-            let serialized_params: Vec<_> = parsed_params
+            let serialized_params = parsed_params
                 .into_iter()
                 .map(|item| match item {
                     ExpEasingOpts::Attenuation => "atenuation",
                     ExpEasingOpts::PositiveOnly => "positive_only",
                 })
-                .collect();
+                .collect::<Vec<_>>()
+                .join(",");
 
             result = Some((
                 field,
-                quote!(#property_hints::EXP_EASING),
-                serialized_params.join(","),
+                quote_spanned!(exp_list.original.span() => Some(#property_hints::EXP_EASING)),
+                quote_spanned!(exp_list.original.span() => Some(String::from(#serialized_params))),
             ));
         }
 
@@ -89,101 +97,133 @@ impl FieldExportOps {
             let field = "file";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(list.original.span(), active_field, field);
             }
 
             let filters = list
+                .parsed
                 .elems
                 .iter()
                 .map(String::from_expr)
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?;
+                .map_err(|err| err.write_errors())?
+                .join(",");
 
-            result = Some((field, quote!(#property_hints::FILE), filters.join(",")));
+            result = Some((
+                field,
+                quote_spanned!(list.original.span() => Some(#property_hints::FILE)),
+                quote_spanned!(list.original.span() => Some(String::from(#filters))),
+            ));
         }
 
         if let Some(list) = self.enum_options.as_ref() {
-            let field = "enum";
+            let field = "enum_options";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(list.original.span(), active_field, field);
             }
 
             let flags = list
+                .parsed
                 .elems
                 .iter()
                 .map(String::from_expr)
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?;
+                .map_err(|err| err.write_errors())?
+                .join(",");
 
-            result = Some((field, quote!(#property_hints::ENUM), flags.join(",")));
+            result = Some((
+                field,
+                quote_spanned!(list.original.span() => Some(#property_hints::ENUM)),
+                quote_spanned!(list.original.span() => Some(String::from(#flags))),
+            ));
         }
 
         if let Some(list) = self.flags.as_ref() {
             let field = "flags";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(list.original.span(), active_field, field);
             }
 
             let flags = list
+                .parsed
                 .elems
                 .iter()
                 .map(String::from_expr)
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?;
+                .map_err(|err| err.write_errors())?
+                .join(",");
 
-            result = Some((field, quote!(#property_hints::FLAGS), flags.join(",")));
+            result = Some((
+                field,
+                quote_spanned!(list.original.span() => Some(#property_hints::FLAGS)),
+                quote_spanned!(list.original.span() => Some(String::from(#flags))),
+            ));
         }
 
-        if self.global_dir {
+        if let Some(global_dir) = self.global_dir.as_ref() {
             let field = "global_dir";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(global_dir.original.span(), active_field, field);
             }
 
-            result = Some((field, quote!(#property_hints::GLOBAL_DIR), String::new()));
+            result = Some((
+                field,
+                quote_spanned!(global_dir.original.span() => Some(#property_hints::GLOBAL_DIR)),
+                quote_spanned!(global_dir.original.span() => Some(String::new())),
+            ));
         }
 
-        if self.global_file {
+        if let Some(global_file) = self.global_file.as_ref() {
             let field = "global_file";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(global_file.original.span(), active_field, field);
             }
 
-            result = Some((field, quote!(#property_hints::GLOBAL_FILE), String::new()));
+            result = Some((
+                field,
+                quote_spanned!(global_file.original.span() => Some(#property_hints::GLOBAL_FILE)),
+                quote_spanned!(global_file.original.span() => Some(String::new())),
+            ));
         }
 
-        if self.multiline {
+        if let Some(multiline) = self.multiline.as_ref() {
             let field = "multiline";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(multiline.original.span(), active_field, field);
             }
 
-            result = Some((field, quote!(#property_hints::MULTILINE), String::new()));
+            result = Some((
+                field,
+                quote_spanned!(multiline.original.span() => Some(#property_hints::MULTILINE)),
+                quote_spanned!(multiline.original.span() => Some(String::new())),
+            ));
         }
 
         if let Some(list) = self.node_path.as_ref() {
             let field = "node_path";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(list.original.span(), active_field, field);
             }
 
             let types = list
+                .parsed
                 .elems
                 .iter()
                 .map(String::from_expr)
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?;
+                .map_err(|err| err.write_errors())?
+                .join(",");
 
             result = Some((
                 field,
-                quote!(#property_hints::NODE_PATH_VALID_TYPES),
-                types.join(","),
+                quote_spanned!(list.original.span() => Some(#property_hints::NODE_PATH_VALID_TYPES)),
+                quote_spanned!(list.original.span() => Some(String::from(#types))),
             ));
         }
 
@@ -191,13 +231,15 @@ impl FieldExportOps {
             let field = "placeholder";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(text.original.span(), active_field, field);
             }
+
+            let content = &text.parsed;
 
             result = Some((
                 field,
-                quote!(#property_hints::PLACEHOLDER_TEXT),
-                text.to_owned(),
+                quote_spanned!(text.original.span() => Some(#property_hints::PLACEHOLDER_TEXT)),
+                quote_spanned!(text.original.span() => Some(String::from(#content))),
             ));
         }
 
@@ -205,33 +247,53 @@ impl FieldExportOps {
             let field = "range";
 
             if let Some((active_field, _, _)) = result {
-                return Self::error(span, active_field, field);
+                return Self::error(ops.original.span(), active_field, field);
             }
 
-            let step = ops.step.unwrap_or(1.0);
+            let step = ops.parsed.step.unwrap_or(1.0);
+            let hint_string = format!("{},{},{}", ops.parsed.min, ops.parsed.max, step);
 
             result = Some((
                 field,
-                quote!(#property_hints::RANGE),
-                format!("{},{},{}", ops.min, ops.max, step),
+                quote_spanned!(ops.original.span() => Some(#property_hints::RANGE)),
+                quote_spanned!(ops.original.span() => Some(String::from(#hint_string))),
             ));
         }
 
-        let result = result
-            .map(|(_, tokens, hint_string)| (tokens, hint_string))
-            .unwrap_or_else(|| (quote!(#property_hints::NONE), String::new()));
+        if let Some(attr_ty) = self.custom_type.as_ref() {
+            let field = "ty";
 
-        Ok(result)
+            if let Some((active_field, _, _)) = result {
+                return Self::error(attr_ty.original.span(), active_field, field);
+            }
+
+            let attr_ty_raw = &attr_ty.parsed;
+
+            let hint = quote_spanned!(ty.span() => None);
+            let hint_string =
+                quote_spanned!(attr_ty.original.span() => Some(String::from(#attr_ty_raw)));
+
+            result = Some((field, hint, hint_string));
+        }
+
+        let (hint, hint_string) = result
+            .map(|(_, tokens, hint_string)| (tokens, hint_string))
+            .unwrap_or_else(|| (quote!(None), quote!(None)));
+
+        let default_hint = quote_spanned!(ty.span() => <#ty as ::godot_rust_script::GodotScriptExport>::hint(#hint));
+        let default_hint_string = quote_spanned!(ty.span() => <#ty as ::godot_rust_script::GodotScriptExport>::hint_string(#hint, #hint_string));
+
+        Ok((default_hint, default_hint_string))
     }
 
     fn error(
         span: Span,
         active_field: &str,
         field: &str,
-    ) -> Result<(TokenStream, String), TokenStream> {
+    ) -> Result<(TokenStream, TokenStream), TokenStream> {
         let err = syn::Error::new(
             span,
-            format!("{} is not compatible with {}", active_field, field),
+            format!("{} is not compatible with {}", field, active_field),
         )
         .into_compile_error();
 

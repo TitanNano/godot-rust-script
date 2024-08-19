@@ -126,7 +126,7 @@ macro_rules! signal_argument_desc {
             ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::variant_type(),
             exported: false,
             hint: PropertyHint::NONE,
-            hint_string: "",
+            hint_string: String::new(),
             description: "",
         }
     };

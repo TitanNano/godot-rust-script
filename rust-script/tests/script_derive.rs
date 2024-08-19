@@ -4,8 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::builtin::{GString, StringName};
-use godot::classes::Node;
+use godot::builtin::{Array, GString, StringName};
+use godot::classes::{Node, Node3D};
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{godot_script_impl, Context, GodotScript, Signal};
 
@@ -13,6 +13,7 @@ use godot_rust_script::{godot_script_impl, Context, GodotScript, Signal};
 #[script(base = Node)]
 struct TestScript {
     pub property_a: GString,
+
     #[export]
     pub editor_prop: u16,
 
@@ -21,6 +22,17 @@ struct TestScript {
 
     #[signal]
     changed: Signal<(u8, u8)>,
+
+    pub node_prop: Option<Gd<Node3D>>,
+
+    #[export(ty = "Decal")]
+    pub node_prop_2: Option<Gd<Node3D>>,
+
+    #[export]
+    pub node_array: Array<Gd<Node3D>>,
+
+    #[export(range(min = 0.0, max = 10.0))]
+    pub int_range: u32,
 
     base: Gd<<Self as GodotScript>::Base>,
 }

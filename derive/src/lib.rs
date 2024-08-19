@@ -9,10 +9,10 @@ mod impl_attribute;
 mod type_paths;
 
 use attribute_ops::{FieldOpts, GodotScriptOpts};
-use darling::{FromAttributes, FromDeriveInput};
+use darling::{ FromAttributes, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
 use type_paths::{godot_types, string_name_ty, variant_ty};
 
 use crate::attribute_ops::{FieldExportOps, PropertyOpts};
@@ -67,7 +67,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 let ops = FieldExportOps::from_attributes(&field.attrs)
                     .map_err(|err| err.write_errors())?;
 
-                ops.hint(field.ident.span())?
+                ops.hint(&field.ty)?
             };
 
             let description = get_field_description(field);
@@ -389,4 +389,34 @@ pub fn godot_script_impl(
 
 fn compile_error(message: &str, tokens: impl ToTokens) -> TokenStream {
     syn::Error::new_spanned(tokens, message).into_compile_error()
+}
+
+fn extract_ident_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream> {
+    match impl_target {
+        Type::Array(_) => Err(compile_error("Arrays are not supported!", impl_target)),
+        Type::BareFn(_) => Err(compile_error(
+            "Bare functions are not supported!",
+            impl_target,
+        )),
+        Type::Group(_) => Err(compile_error("Groups are not supported!", impl_target)),
+        Type::ImplTrait(_) => Err(compile_error("Impl traits are not suppored!", impl_target)),
+        Type::Infer(_) => Err(compile_error("Infer is not supported!", impl_target)),
+        Type::Macro(_) => Err(compile_error("Macro types are not supported!", impl_target)),
+        Type::Never(_) => Err(compile_error("Never type is not supported!", impl_target)),
+        Type::Paren(_) => Err(compile_error("Unsupported type!", impl_target)),
+        Type::Path(ref path) => Ok(path.path.segments.last().unwrap().ident.clone()),
+        Type::Ptr(_) => Err(compile_error(
+            "Pointer types are not supported!",
+            impl_target,
+        )),
+        Type::Reference(_) => Err(compile_error("References are not supported!", impl_target)),
+        Type::Slice(_) => Err(compile_error("Slices are not supported!", impl_target)),
+        Type::TraitObject(_) => Err(compile_error(
+            "Trait objects are not supported!",
+            impl_target,
+        )),
+        Type::Tuple(_) => Err(compile_error("Tuples are not supported!", impl_target)),
+        Type::Verbatim(_) => Err(compile_error("Verbatim is not supported!", impl_target)),
+        _ => Err(compile_error("Unsupported type!", impl_target)),
+    }
 }
