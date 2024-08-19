@@ -13,7 +13,8 @@ use godot::prelude::{
 };
 use itertools::Itertools;
 
-use crate::{apply::Apply, RustScriptMetaData};
+use crate::apply::Apply;
+use crate::static_script_registry::RustScriptMetaData;
 
 use super::{rust_script::RustScript, SCRIPT_REGISTRY};
 

@@ -72,7 +72,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             let description = get_field_description(field);
             let item = quote! {
-                ::godot_rust_script::RustScriptPropDesc {
+                ::godot_rust_script::private_export::RustScriptPropDesc {
                     name: #name,
                     ty: #ty,
                     exported: #exported,
@@ -97,7 +97,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         let signal_type = &field.ty;
 
         quote! {
-            ::godot_rust_script::RustScriptSignalDesc {
+            ::godot_rust_script::private_export::RustScriptSignalDesc {
                 name: #signal_name,
                 arguments: <#signal_type as ::godot_rust_script::ScriptSignal>::argument_desc(),
                 description: concat!(#signal_description),

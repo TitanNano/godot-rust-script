@@ -5,24 +5,22 @@
  */
 
 mod apply;
-mod script_registry;
-mod shared;
 
-#[cfg(feature = "scripts")]
-mod library;
-#[cfg(feature = "runtime")]
+mod interface;
 mod runtime;
+mod static_script_registry;
 
-#[cfg(feature = "scripts")]
-pub use library::*;
-#[cfg(feature = "runtime")]
-pub use runtime::*;
-
-#[cfg(feature = "scripts")]
 pub use godot_rust_script_derive::{godot_script_impl, GodotScript};
+pub use interface::*;
+pub use runtime::RustScriptExtensionLayer;
 
+#[doc(hidden)]
 pub mod private_export {
-    pub use super::shared::__godot_rust_plugin_SCRIPT_REGISTRY;
+    pub use crate::static_script_registry::{
+        RustScriptMetaData, __godot_rust_plugin_SCRIPT_REGISTRY, assemble_metadata,
+        create_default_data_struct, RegistryItem, RustScriptEntry, RustScriptEntryMethods,
+        RustScriptMethodDesc, RustScriptPropDesc, RustScriptSignalDesc,
+    };
     pub use const_str::{concat, replace, strip_prefix, unwrap};
     pub use godot::sys::{plugin_add, plugin_registry};
 }

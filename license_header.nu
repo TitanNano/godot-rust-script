@@ -27,6 +27,6 @@ def main []: nothing -> nothing {
       continue
     }
 
-    read_file $file | prepend $license_notice | str join "\n" |  save -f $file.name
+    read_file $file | prepend $license_notice | str join "\n" | collect | save -f $file
   }
 }

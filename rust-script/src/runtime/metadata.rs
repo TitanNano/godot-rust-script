@@ -132,8 +132,8 @@ pub struct Documented<T> {
     description: &'static str,
 }
 
-impl From<crate::script_registry::RustScriptPropertyInfo> for Documented<PropertyInfo> {
-    fn from(value: crate::script_registry::RustScriptPropertyInfo) -> Self {
+impl From<crate::static_script_registry::RustScriptPropertyInfo> for Documented<PropertyInfo> {
+    fn from(value: crate::static_script_registry::RustScriptPropertyInfo) -> Self {
         Self {
             description: value.description,
             inner: (&value).into(),
@@ -141,8 +141,8 @@ impl From<crate::script_registry::RustScriptPropertyInfo> for Documented<Propert
     }
 }
 
-impl From<crate::script_registry::RustScriptMethodInfo> for Documented<MethodInfo> {
-    fn from(value: crate::script_registry::RustScriptMethodInfo) -> Self {
+impl From<crate::static_script_registry::RustScriptMethodInfo> for Documented<MethodInfo> {
+    fn from(value: crate::static_script_registry::RustScriptMethodInfo) -> Self {
         Self {
             description: value.description,
             inner: (&value).into(),
@@ -150,8 +150,8 @@ impl From<crate::script_registry::RustScriptMethodInfo> for Documented<MethodInf
     }
 }
 
-impl From<crate::script_registry::RustScriptSignalInfo> for Documented<MethodInfo> {
-    fn from(value: crate::script_registry::RustScriptSignalInfo) -> Self {
+impl From<crate::static_script_registry::RustScriptSignalInfo> for Documented<MethodInfo> {
+    fn from(value: crate::static_script_registry::RustScriptSignalInfo) -> Self {
         Self {
             description: value.description,
             inner: (&value).into(),
