@@ -4,9 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::classes::{
-    file_access, ClassDb, FileAccess, IResourceFormatLoader, IScriptLanguageExtension, Script,
-};
+use godot::classes::{ClassDb, IResourceFormatLoader, IScriptLanguageExtension, Script};
 use godot::global::godot_print;
 use godot::obj::Base;
 use godot::prelude::{
@@ -81,13 +79,8 @@ impl IResourceFormatLoader for RustScriptResourceLoader {
         godot_print!("loading script with path: {}, {}", path, original_path);
 
         let class_name = RustScriptLanguage::path_to_class_name(&path);
-
-        let handle = FileAccess::open(path, file_access::ModeFlags::READ).unwrap();
         let rust_script = RustScript::new(class_name);
-
-        let mut script: Gd<Script> = rust_script.upcast();
-
-        script.set_source_code(handle.get_as_text());
+        let script: Gd<Script> = rust_script.upcast();
 
         script.to_variant()
     }
