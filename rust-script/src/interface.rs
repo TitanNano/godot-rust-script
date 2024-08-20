@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+mod export;
 mod signals;
 
 use std::marker::PhantomData;
@@ -15,6 +16,7 @@ use godot::prelude::{Gd, Object, StringName, Variant};
 
 pub use crate::runtime::Context;
 
+pub use export::GodotScriptExport;
 pub use signals::{ScriptSignal, Signal};
 
 pub trait GodotScript: Debug + GodotScriptImpl<ImplBase = Self::Base> {

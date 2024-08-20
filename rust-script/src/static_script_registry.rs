@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use godot::builtin::{GString, StringName};
 use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
-use godot::meta::{ClassName, MethodInfo, PropertyInfo};
+use godot::meta::{ClassName, MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::{EngineBitfield, EngineEnum};
 use godot::prelude::{Gd, Object};
 use godot::sys::VariantType;
@@ -82,7 +82,7 @@ pub struct RustScriptPropDesc {
     pub ty: VariantType,
     pub exported: bool,
     pub hint: PropertyHint,
-    pub hint_string: &'static str,
+    pub hint_string: String,
     pub description: &'static str,
 }
 
@@ -98,7 +98,7 @@ impl RustScriptPropDesc {
                 PropertyUsageFlags::NONE.ord()
             },
             hint: self.hint.ord(),
-            hint_string: self.hint_string,
+            hint_string: self.hint_string.clone(),
             description: self.description,
         }
     }
@@ -212,7 +212,7 @@ pub struct RustScriptPropertyInfo {
     pub property_name: &'static str,
     pub class_name: &'static str,
     pub hint: i32,
-    pub hint_string: &'static str,
+    pub hint_string: String,
     pub usage: u64,
     pub description: &'static str,
 }
@@ -224,7 +224,7 @@ impl From<&RustScriptPropertyInfo> for PropertyInfo {
             property_name: value.property_name.into(),
             class_name: ClassName::from_ascii_cstr(value.class_name.as_bytes()),
             hint: PropertyHint::try_from_ord(value.hint).unwrap_or(PropertyHint::NONE),
-            hint_string: value.hint_string.into(),
+            hint_string: value.hint_string.to_godot(),
             usage: PropertyUsageFlags::try_from_ord(value.usage)
                 .unwrap_or(PropertyUsageFlags::NONE),
         }
