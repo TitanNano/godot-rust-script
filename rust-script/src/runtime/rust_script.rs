@@ -38,9 +38,6 @@ pub(crate) struct RustScript {
     #[var(get = get_class_name, set = set_class_name, usage_flags = [STORAGE])]
     class_name: GString,
 
-    #[var(usage_flags = [STORAGE])]
-    source_code: GString,
-
     #[var( get = owner_ids, set = set_owner_ids, usage_flags = [STORAGE])]
     #[allow(dead_code)]
     owner_ids: Array<i64>,
@@ -150,7 +147,6 @@ impl IScriptExtension for RustScript {
     fn init(base: Base<Self::Base>) -> Self {
         Self {
             class_name: GString::new(),
-            source_code: GString::new(),
             base,
             owners: Default::default(),
             owner_ids: Default::default(),
@@ -162,11 +158,10 @@ impl IScriptExtension for RustScript {
     }
 
     fn get_source_code(&self) -> GString {
-        self.source_code.clone()
+        GString::default()
     }
-    fn set_source_code(&mut self, code: GString) {
-        self.source_code = code;
-    }
+
+    fn set_source_code(&mut self, _code: GString) {}
 
     fn get_language(&self) -> Option<Gd<ScriptLanguage>> {
         RustScriptLanguage::singleton().map(Gd::upcast)
@@ -426,5 +421,9 @@ impl IScriptExtension for RustScript {
 
             self.reload(false);
         }
+    }
+
+    fn has_source_code(&self) -> bool {
+        false
     }
 }

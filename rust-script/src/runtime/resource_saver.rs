@@ -30,6 +30,10 @@ impl IResourceFormatSaver for RustScriptResourceSaver {
             script.set_path(path.clone());
         }
 
+        if !script.has_source_code() {
+            return global::Error::OK;
+        }
+
         let handle = FileAccess::open(path, file_access::ModeFlags::WRITE);
 
         let mut handle = match handle {

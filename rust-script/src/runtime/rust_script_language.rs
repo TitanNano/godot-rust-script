@@ -7,6 +7,7 @@
 use std::ffi::OsStr;
 
 use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
+use godot::global;
 use godot::obj::Base;
 use godot::prelude::{
     godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray, VariantArray,
@@ -14,6 +15,7 @@ use godot::prelude::{
 use itertools::Itertools;
 
 use crate::apply::Apply;
+use crate::editor_ui_hacks::{show_editor_toast, EditorToaserSeverity};
 use crate::static_script_registry::RustScriptMetaData;
 
 use super::{rust_script::RustScript, SCRIPT_REGISTRY};
@@ -189,7 +191,21 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     }
 
     fn overrides_external_editor(&mut self) -> bool {
-        false
+        true
+    }
+
+    fn open_in_external_editor(
+        &mut self,
+        _script: Gd<Script>,
+        _line: i32,
+        _col: i32,
+    ) -> global::Error {
+        show_editor_toast(
+            "Editing rust scripts from inside Godot is currently not supported.",
+            EditorToaserSeverity::Warning,
+        );
+
+        global::Error::OK
     }
 
     fn get_string_delimiters(&self) -> PackedStringArray {

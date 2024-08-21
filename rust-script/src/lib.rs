@@ -6,6 +6,7 @@
 
 mod apply;
 
+mod editor_ui_hacks;
 mod interface;
 mod runtime;
 mod static_script_registry;
