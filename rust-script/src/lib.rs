@@ -11,7 +11,7 @@ mod interface;
 mod runtime;
 mod static_script_registry;
 
-pub use godot_rust_script_derive::{godot_script_impl, GodotScript};
+pub use godot_rust_script_derive::{godot_script_impl, GodotScript, GodotScriptEnum};
 pub use interface::*;
 pub use runtime::RustScriptExtensionLayer;
 

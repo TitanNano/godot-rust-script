@@ -7,7 +7,16 @@
 use godot::builtin::{Array, GString, StringName};
 use godot::classes::{Node, Node3D};
 use godot::obj::{Gd, NewAlloc};
-use godot_rust_script::{godot_script_impl, Context, GodotScript, Signal};
+use godot_rust_script::{godot_script_impl, Context, GodotScript, GodotScriptEnum, Signal};
+
+#[derive(Debug, Default, GodotScriptEnum)]
+#[script_enum(export)]
+pub enum ScriptEnum {
+    #[default]
+    One,
+    Two,
+    Three,
+}
 
 #[derive(GodotScript, Debug)]
 #[script(base = Node)]
@@ -33,6 +42,9 @@ struct TestScript {
 
     #[export(range(min = 0.0, max = 10.0))]
     pub int_range: u32,
+
+    #[export]
+    pub custom_enum: ScriptEnum,
 
     base: Gd<<Self as GodotScript>::Base>,
 }

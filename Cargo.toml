@@ -14,10 +14,10 @@ godot = { git = "https://github.com/godot-rust/gdext", tag = "v0.1.3", features 
 godot-cell = { git = "https://github.com/godot-rust/gdext", tag = "v0.1.3" }
 itertools = "0.10.3"
 rand = "0.8.5"
-darling = { version = "0.20.10" }
+darling = { version = "0.20" }
 proc-macro2 = "1.0.68"
-quote = "1.0.33"
-syn = "2.0.38"
+quote = "1"
+syn = "2"
 const-str = "0.5.6"
 thiserror = "1"
 

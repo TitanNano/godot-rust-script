@@ -28,3 +28,9 @@ pub fn string_name_ty() -> TokenStream {
 
     quote!(#godot_types::prelude::StringName)
 }
+
+pub fn convert_error_ty() -> TokenStream {
+    let godot_types = godot_types();
+
+    quote!(#godot_types::meta::error::ConvertError)
+}
