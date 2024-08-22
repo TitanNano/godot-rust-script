@@ -15,12 +15,12 @@ use godot::builtin::{
 };
 use godot::engine::{Node, Resource};
 use godot::global::PropertyHint;
-use godot::meta::{ArrayElement, GodotType};
+use godot::meta::{ArrayElement, FromGodot, GodotConvert, GodotType, ToGodot};
 use godot::obj::{EngineEnum, Gd};
 use godot::prelude::GodotClass;
 use godot::sys::GodotFfi;
 
-pub trait GodotScriptExport {
+pub trait GodotScriptExport: GodotConvert + FromGodot + ToGodot {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String;
 
     fn hint(custom: Option<PropertyHint>) -> PropertyHint;
@@ -50,7 +50,10 @@ impl<T: GodotClass> GodotScriptExport for Gd<T> {
     }
 }
 
-impl<T: GodotScriptExport> GodotScriptExport for Option<T> {
+impl<T: GodotScriptExport> GodotScriptExport for Option<T>
+where
+    <<T as GodotConvert>::Via as GodotType>::Ffi: godot::sys::GodotNullableFfi,
+{
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
         T::hint_string(custom_hint, custom_string)
     }

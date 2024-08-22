@@ -11,6 +11,7 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fmt::Debug};
 
+use godot::meta::{FromGodot, GodotConvert, ToGodot};
 use godot::obj::Inherits;
 use godot::prelude::{Gd, Object, StringName, Variant};
 
@@ -200,6 +201,8 @@ macro_rules! setup_library {
         );
     };
 }
+
+pub trait GodotScriptEnum: GodotConvert + FromGodot + ToGodot {}
 
 #[macro_export]
 macro_rules! init {

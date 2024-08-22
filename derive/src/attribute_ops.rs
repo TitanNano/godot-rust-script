@@ -5,7 +5,7 @@
  */
 
 use darling::ast::Data;
-use darling::util::{self, WithOriginal};
+use darling::util::{self, SpannedValue, WithOriginal};
 use darling::{FromAttributes, FromDeriveInput, FromField, FromMeta};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
@@ -327,7 +327,7 @@ pub struct FieldOpts {
 #[darling(supports(struct_any), attributes(script), forward_attrs(doc))]
 pub struct GodotScriptOpts {
     pub ident: syn::Ident,
-    pub data: Data<util::Ignored, FieldOpts>,
+    pub data: Data<util::Ignored, SpannedValue<FieldOpts>>,
     pub base: Option<syn::Ident>,
     pub attrs: Vec<syn::Attribute>,
 }

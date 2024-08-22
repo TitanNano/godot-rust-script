@@ -7,13 +7,14 @@
 mod attribute_ops;
 mod impl_attribute;
 mod type_paths;
+mod enums;
 
 use attribute_ops::{FieldOpts, GodotScriptOpts};
-use darling::{ FromAttributes, FromDeriveInput};
+use darling::{ util::SpannedValue, FromAttributes, FromDeriveInput};
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
-use type_paths::{godot_types, string_name_ty, variant_ty};
+use type_paths::{godot_types, property_hints, string_name_ty, variant_ty};
 
 use crate::attribute_ops::{FieldExportOps, PropertyOpts};
 
@@ -27,6 +28,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let variant_ty = variant_ty();
     let string_name_ty = string_name_ty();
     let call_error_ty = quote!(#godot_types::sys::GDExtensionCallErrorType);
+    let property_hint_ty = property_hints();
 
     let base_class = opts
         .base
@@ -63,12 +65,17 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 .iter()
                 .any(|attr| attr.path().is_ident("export"));
 
-            let (hint, hint_string) = {
+            let (hint, hint_string) = exported.then(|| {
                 let ops = FieldExportOps::from_attributes(&field.attrs)
                     .map_err(|err| err.write_errors())?;
 
-                ops.hint(&field.ty)?
-            };
+                ops.hint(&field.ty)
+            }).transpose()?.unwrap_or_else(|| {
+                    (
+                        quote_spanned!(field.span()=> #property_hint_ty::NONE),
+                        quote_spanned!(field.span()=> String::new()),
+                    )
+                });
 
             let description = get_field_description(field);
             let item = quote! {
@@ -176,8 +183,9 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
         T::Path(path) => Ok(quote_spanned! {
             ty.span() => {
                 use #godot_types::sys::GodotFfi;
+                use #godot_types::meta::GodotType;
 
-                <#path as #godot_types::meta::GodotType>::Ffi::variant_type()
+                <<#path as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::variant_type()
             }
         }),
         T::Verbatim(_) => Err(syn::Error::new(
@@ -197,8 +205,9 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
             Ok(quote_spanned! {
                 tuple.span() => {
                     use #godot_types::sys::GodotFfi;
+                    use #godot_types::meta::GodotType;
 
-                    <#tuple as #godot_types::meta::GodotType>::Ffi::variant_type()
+                    <<#tuple as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::variant_type()
                 }
             })
         }
@@ -218,7 +227,7 @@ fn is_context_type(ty: &syn::Type) -> bool {
     path.path.segments.last().map(|segment| segment.ident == "Context").unwrap_or(false)
 }
 
-fn derive_default_with_base(field_opts: &[FieldOpts]) -> TokenStream {
+fn derive_default_with_base(field_opts: &[SpannedValue<FieldOpts>]) -> TokenStream {
     let godot_types = godot_types();
     let fields: TokenStream = field_opts
         .iter()
@@ -245,7 +254,7 @@ fn derive_default_with_base(field_opts: &[FieldOpts]) -> TokenStream {
     }
 }
 
-fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a) -> TokenStream {
+fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a SpannedValue<FieldOpts>> + 'a) -> TokenStream {
     let godot_types = godot_types();
     let string_name_ty = string_name_ty();
     let variant_ty = variant_ty();
@@ -262,11 +271,11 @@ fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
             };
 
             let accessor = match opts.get {
-                Some(getter) => quote_spanned!(getter.span() => #getter(&self)),
-                None => quote!(self.#field_ident),
+                Some(getter) => quote_spanned!(getter.span()=> #getter(&self)),
+                None => quote_spanned!(field_ident.span()=> self.#field_ident),
             };
 
-            quote! {
+            quote_spanned! {field.ty.span()=> 
                 #[allow(clippy::needless_borrow)]
                 #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&#accessor)),
             }
@@ -284,7 +293,7 @@ fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
     }
 }
 
-fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a) -> TokenStream {
+fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a SpannedValue<FieldOpts>> + 'a) -> TokenStream {
     let string_name_ty = string_name_ty();
     let variant_ty = variant_ty();
     let godot_types = godot_types();
@@ -300,15 +309,14 @@ fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
                 Err(err) => return err.write_errors(),
             };
 
-            let variant_value = quote!(#godot_types::prelude::FromGodot::try_from_variant(&value));
+            let variant_value = quote_spanned!(field.ty.span()=> #godot_types::prelude::FromGodot::try_from_variant(&value));
 
             let assignment = match opts.set {
-                Some(setter) => quote_spanned!(setter.span() => #setter(self, local_value)),
-                None => quote!(self.#field_ident = local_value),
+                Some(setter) => quote_spanned!(setter.span()=> #setter(self, local_value)),
+                None => quote_spanned!(field.ty.span() => self.#field_ident = local_value),
             };
 
-            quote_spanned! {
-                field_ident.span() =>
+            quote! {
                 #field_name => {
                     let local_value = match #variant_value {
                         Ok(v) => v,
@@ -334,7 +342,7 @@ fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a FieldOpts> + 'a
 }
 
 fn derive_property_states_export<'a>(
-    public_fields: impl Iterator<Item = &'a FieldOpts> + 'a,
+    public_fields: impl Iterator<Item = &'a SpannedValue<FieldOpts>> + 'a,
 ) -> TokenStream {
     let string_name_ty = string_name_ty();
     let variant_ty = variant_ty();
@@ -419,4 +427,9 @@ fn extract_ident_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream
         Type::Verbatim(_) => Err(compile_error("Verbatim is not supported!", impl_target)),
         _ => Err(compile_error("Unsupported type!", impl_target)),
     }
+}
+
+#[proc_macro_derive(GodotScriptEnum, attributes(script_enum))]
+pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    enums::script_enum_derive(input)
 }
