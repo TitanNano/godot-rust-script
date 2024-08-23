@@ -4,4 +4,4 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-godot_rust_script::setup_library!();
+godot_rust_script::define_script_root!();
