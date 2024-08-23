@@ -20,6 +20,7 @@ quote = "1"
 syn = "2"
 const-str = "0.5.6"
 thiserror = "1"
+sha2-const = { git = "https://github.com/SuperFluffy/sha2-const", rev = "8a02ef1340c2de20a690840b45f298d55985d4da"}
 
 godot-rust-script-derive = { path = "derive" }
 tests-scripts-lib = { path = "tests-scripts-lib" }

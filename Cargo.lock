@@ -186,6 +186,7 @@ dependencies = [
  "itertools",
  "once_cell",
  "rand",
+ "sha2-const",
  "tests-scripts-lib",
  "thiserror",
 ]
@@ -343,6 +344,11 @@ name = "regex-syntax"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
+
+[[package]]
+name = "sha2-const"
+version = "0.1.2"
+source = "git+https://github.com/SuperFluffy/sha2-const?rev=8a02ef1340c2de20a690840b45f298d55985d4da#8a02ef1340c2de20a690840b45f298d55985d4da"
 
 [[package]]
 name = "strsim"

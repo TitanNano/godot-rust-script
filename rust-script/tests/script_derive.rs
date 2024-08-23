@@ -4,10 +4,16 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::builtin::{Array, GString, StringName};
+use std::marker::PhantomData;
+
+use godot::builtin::{Array, GString, StringName, Variant};
 use godot::classes::{Node, Node3D};
+use godot::engine::Object;
+use godot::meta::ToGodot;
 use godot::obj::{Gd, NewAlloc};
-use godot_rust_script::{godot_script_impl, Context, GodotScript, GodotScriptEnum, Signal};
+use godot_rust_script::{
+    godot_script_impl, Context, GodotScript, GodotScriptEnum, GodotScriptImpl, RsRef, Signal,
+};
 
 #[derive(Debug, Default, GodotScriptEnum)]
 #[script_enum(export)]
@@ -70,5 +76,86 @@ impl TestScript {
         });
 
         result
+    }
+}
+
+#[diagnostic::on_unimplemented(
+    label = "The impl of this trait is missing a #[godot_script_trait] attribute!",
+    message = "The implementation of this trait for {Self} has not been marked with #[godot_script_trait]"
+)]
+trait GodotScriptTraitDispatch<const TRAIT_ID: u64>: GodotScriptImpl {
+    fn call(&mut self, method: GString, args: &[Variant], context: Context<'_, Self>);
+}
+
+trait TestScriptTrait {
+    fn perform_action(&self, action: GString);
+}
+
+impl TestScriptTrait for TestScript {
+    fn perform_action(&self, action: GString) {
+        todo!()
+    }
+}
+
+const fn byte_array_to_u64<const LENGTH: usize>(array: [u8; LENGTH]) -> u64 {
+    let mut result: u64 = 0;
+    let mut i = 0;
+
+    while i < 8 {
+        result |= (array[i] as u64) << (i * 8);
+        i += 1;
+    }
+
+    result
+}
+
+const TEST_SCRIPT_TRAIT_ID: u64 = {
+    let digest = sha2_const::Sha224::new()
+        .update(b"TestScriptTrait")
+        .finalize();
+
+    byte_array_to_u64(digest)
+};
+
+impl GodotScriptTraitDispatch<TEST_SCRIPT_TRAIT_ID> for TestScript {
+    fn call(&mut self, method: GString, args: &[Variant], context: Context<'_, Self>) {
+        match method.to_string().as_str() {
+            "TestScriptTrait__perform_action" => self.perform_action(GString::new()),
+            "TestScriptTRait__method_x" => self.perform_action(GString::new()),
+            _ => (),
+        }
+    }
+}
+
+fn call_trait_method(method: GString, args: &[Variant], context: Context<'_, TestScript>) {
+    let s = TestScript {
+        property_a: todo!(),
+        editor_prop: todo!(),
+        enum_prop: todo!(),
+        changed: todo!(),
+        node_prop: todo!(),
+        node_prop_2: todo!(),
+        node_array: todo!(),
+        int_range: todo!(),
+        custom_enum: todo!(),
+        base: todo!(),
+    };
+
+    <TestScript as GodotScriptTraitDispatch<TEST_SCRIPT_TRAIT_ID>>::call(
+        &mut s, method, args, context,
+    )
+}
+
+struct RsDyn<T: ?Sized> {
+    object: Gd<Object>,
+    trait_type: PhantomData<T>,
+}
+
+impl TestScriptTrait for RsDyn<dyn TestScriptTrait> {
+    fn perform_action(&self, action: GString) {
+        self.object.clone().call(
+            "TestScriptTrait__perform_action".into(),
+            &[action.to_variant()],
+        );
     }
 }

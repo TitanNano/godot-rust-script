@@ -20,6 +20,7 @@ thiserror.workspace = true
 [dev-dependencies]
 tests-scripts-lib = { path = "../tests-scripts-lib" }
 godot-rust-script = { path = "./", features = ["runtime"] }
+sha2-const.workspace = true
 
 [features]
 default = ["runtime", "scripts"]
