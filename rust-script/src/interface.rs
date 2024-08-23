@@ -172,7 +172,7 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
 }
 
 #[macro_export]
-macro_rules! setup_library {
+macro_rules! define_script_root {
     () => {
         #[no_mangle]
         pub fn __godot_rust_script_init(
@@ -199,6 +199,14 @@ macro_rules! setup_library {
                 "/"
             ),
         );
+    };
+}
+
+#[deprecated = "Has been renamed to define_script_root!()"]
+#[macro_export]
+macro_rules! setup_library {
+    () => {
+        ::godot_rust_script::define_script_root!();
     };
 }
 
