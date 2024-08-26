@@ -5,12 +5,13 @@
  */
 
 mod attribute_ops;
+mod enums;
 mod impl_attribute;
 mod type_paths;
-mod enums;
 
 use attribute_ops::{FieldOpts, GodotScriptOpts};
-use darling::{ util::SpannedValue, FromAttributes, FromDeriveInput};
+use darling::{util::SpannedValue, FromAttributes, FromDeriveInput};
+use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
@@ -28,7 +29,6 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let variant_ty = variant_ty();
     let string_name_ty = string_name_ty();
     let call_error_ty = quote!(#godot_types::sys::GDExtensionCallErrorType);
-    let property_hint_ty = property_hints();
 
     let base_class = opts
         .base
@@ -39,82 +39,81 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let class_name = script_type_ident.to_string();
     let fields = opts.data.take_struct().unwrap().fields;
 
-    let public_fields = fields.iter().filter(|field| {
-        matches!(field.vis, syn::Visibility::Public(_))
-            || field.attrs.iter().any(|attr| attr.path().is_ident("prop"))
-    });
-
-    let signal_fields = fields.iter().filter(|field| {
-        field.attrs.iter().any(|attr| attr.path().is_ident("signal"))
-    });
-
-    let field_metadata_result: Result<TokenStream, TokenStream> = public_fields
-        .clone()
-        .filter(|field| !field.attrs.iter().any(|attr| attr.path().is_ident("signal")))
+    let (
+        field_metadata,
+        signal_metadata,
+        get_fields_dispatch,
+        set_fields_dispatch,
+        export_field_state,
+    ): (
+        TokenStream,
+        TokenStream,
+        TokenStream,
+        TokenStream,
+        TokenStream,
+    ) = fields
+        .iter()
         .map(|field| {
-            let name = field
-                .ident
-                .as_ref()
-                .map(|field| field.to_string())
-                .unwrap_or_default();
-
-            let ty = rust_to_variant_type(&field.ty)?;
-
-            let exported = field
+            let signal_attr = field
                 .attrs
                 .iter()
-                .any(|attr| attr.path().is_ident("export"));
+                .find(|attr| attr.path().is_ident("signal"));
+            let export_attr = field
+                .attrs
+                .iter()
+                .find(|attr| attr.path().is_ident("export"));
 
-            let (hint, hint_string) = exported.then(|| {
-                let ops = FieldExportOps::from_attributes(&field.attrs)
-                    .map_err(|err| err.write_errors())?;
+            let is_public = matches!(field.vis, syn::Visibility::Public(_))
+                || field.attrs.iter().any(|attr| attr.path().is_ident("prop"));
+            let is_exported = export_attr.is_some();
+            let is_signal = signal_attr.is_some();
 
-                ops.hint(&field.ty)
-            }).transpose()?.unwrap_or_else(|| {
-                    (
-                        quote_spanned!(field.span()=> #property_hint_ty::NONE),
-                        quote_spanned!(field.span()=> String::new()),
-                    )
-                });
+            let field_metadata = match (is_public, is_exported, is_signal) {
+                (false, false, _) | (true, false, true) => TokenStream::default(),
+                (false, true, _) => {
+                    let err = compile_error("Only public fields can be exported!", export_attr);
 
-            let description = get_field_description(field);
-            let item = quote! {
-                ::godot_rust_script::private_export::RustScriptPropDesc {
-                    name: #name,
-                    ty: #ty,
-                    exported: #exported,
-                    hint: #hint,
-                    hint_string: #hint_string,
-                    description: concat!(#description),
-                },
+                    quote! {#err,}
+                }
+                (true, _, false) => {
+                    derive_field_metadata(field, is_exported).unwrap_or_else(|err| err)
+                }
+                (true, true, true) => {
+                    let err = compile_error("Signals can not be exported!", export_attr);
+
+                    quote! {#err,}
+                }
             };
 
-            Ok(item)
+            let get_field_dispatch = is_public.then(|| derive_get_field_dispatch(field));
+            let set_field_dispatch =
+                (is_public && !is_signal).then(|| derive_set_field_dispatch(field));
+            let export_field_state =
+                (is_public && !is_signal).then(|| derive_property_state_export(field));
+
+            let signal_metadata = match (is_public, is_signal) {
+                (false, false) | (true, false) => TokenStream::default(),
+                (true, true) => derive_signal_metadata(field),
+                (false, true) => {
+                    let err = compile_error("Signals must be public!", signal_attr);
+
+                    quote! {#err,}
+                }
+            };
+
+            (
+                field_metadata,
+                signal_metadata,
+                get_field_dispatch.to_token_stream(),
+                set_field_dispatch.to_token_stream(),
+                export_field_state.to_token_stream(),
+            )
         })
-        .collect();
+        .multiunzip();
 
-    let field_metadata = match field_metadata_result {
-        Ok(meta) => meta,
-        Err(err) => return err.into(),
-    };
-
-    let signal_metadata_result: TokenStream = signal_fields.clone().map(|field| {
-        let signal_name = field.ident.as_ref().map(|ident| ident.to_string()).unwrap_or_default();
-        let signal_description = get_field_description(field);
-        let signal_type = &field.ty;
-
-        quote! {
-            ::godot_rust_script::private_export::RustScriptSignalDesc {
-                name: #signal_name,
-                arguments: <#signal_type as ::godot_rust_script::ScriptSignal>::argument_desc(),
-                description: concat!(#signal_description),
-            },
-        }
-    }).collect();
-
-    let get_fields_impl = derive_get_fields(public_fields.clone().chain(signal_fields));
-    let set_fields_impl = derive_set_fields(public_fields.clone());
-    let properties_state_impl = derive_property_states_export(public_fields);
+    let get_fields_impl = derive_get_fields(get_fields_dispatch);
+    let set_fields_impl = derive_set_fields(set_fields_dispatch);
+    let properties_state_impl = derive_property_states_export(export_field_state);
     let default_impl = derive_default_with_base(&fields);
 
     let description = opts
@@ -133,13 +132,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             acc.extend(lit);
             acc
         });
-    
+
     let output = quote! {
         impl ::godot_rust_script::GodotScript for #script_type_ident {
             type Base = #base_class;
 
             const CLASS_NAME: &'static str = #class_name;
-            
+
             #get_fields_impl
 
             #set_fields_impl
@@ -165,7 +164,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 #field_metadata
             ],
             vec![
-                #signal_metadata_result
+                #signal_metadata
             ]
         );
 
@@ -224,7 +223,11 @@ fn is_context_type(ty: &syn::Type) -> bool {
         return false;
     };
 
-    path.path.segments.last().map(|segment| segment.ident == "Context").unwrap_or(false)
+    path.path
+        .segments
+        .last()
+        .map(|segment| segment.ident == "Context")
+        .unwrap_or(false)
 }
 
 fn derive_default_with_base(field_opts: &[SpannedValue<FieldOpts>]) -> TokenStream {
@@ -239,7 +242,7 @@ fn derive_default_with_base(field_opts: &[SpannedValue<FieldOpts>]) -> TokenStre
             Some(ident) if field.attrs.iter().any(|attr| attr.path().is_ident("signal")) => {
                 Some(quote_spanned!(ident.span() => #ident: ::godot_rust_script::ScriptSignal::new(base.clone(), stringify!(#ident)),))
             }
-            
+
             Some(ident) => Some(quote_spanned!(ident.span() => #ident: Default::default(),)),
             None => None,
         })
@@ -254,33 +257,31 @@ fn derive_default_with_base(field_opts: &[SpannedValue<FieldOpts>]) -> TokenStre
     }
 }
 
-fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a SpannedValue<FieldOpts>> + 'a) -> TokenStream {
+fn derive_get_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
     let godot_types = godot_types();
+
+    let field_ident = field.ident.as_ref().unwrap();
+    let field_name = field_ident.to_string();
+
+    let opts = match PropertyOpts::from_attributes(&field.attrs) {
+        Ok(opts) => opts,
+        Err(err) => return err.write_errors(),
+    };
+
+    let accessor = match opts.get {
+        Some(getter) => quote_spanned!(getter.span()=> #getter(&self)),
+        None => quote_spanned!(field_ident.span()=> self.#field_ident),
+    };
+
+    quote_spanned! {field.ty.span()=>
+        #[allow(clippy::needless_borrow)]
+        #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&#accessor)),
+    }
+}
+
+fn derive_get_fields(get_field_dispatch: TokenStream) -> TokenStream {
     let string_name_ty = string_name_ty();
     let variant_ty = variant_ty();
-
-    let get_field_dispatch: TokenStream = public_fields
-        .filter(|field| field.ident.is_some())
-        .map(|field| {
-            let field_ident = field.ident.as_ref().unwrap();
-            let field_name = field_ident.to_string();
-
-            let opts = match PropertyOpts::from_attributes(&field.attrs) {
-                Ok(opts) => opts,
-                Err(err) => return err.write_errors(),
-            };
-
-            let accessor = match opts.get {
-                Some(getter) => quote_spanned!(getter.span()=> #getter(&self)),
-                None => quote_spanned!(field_ident.span()=> self.#field_ident),
-            };
-
-            quote_spanned! {field.ty.span()=> 
-                #[allow(clippy::needless_borrow)]
-                #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&#accessor)),
-            }
-        })
-        .collect();
 
     quote! {
         fn get(&self, name: #string_name_ty) -> ::std::option::Option<#variant_ty> {
@@ -293,42 +294,40 @@ fn derive_get_fields<'a>(public_fields: impl Iterator<Item = &'a SpannedValue<Fi
     }
 }
 
-fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a SpannedValue<FieldOpts>> + 'a) -> TokenStream {
-    let string_name_ty = string_name_ty();
-    let variant_ty = variant_ty();
+fn derive_set_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
     let godot_types = godot_types();
 
-    let set_field_dispatch: TokenStream = public_fields
-        .filter(|field| field.ident.is_some())
-        .map(|field| {
-            let field_ident = field.ident.as_ref().unwrap();
-            let field_name = field_ident.to_string();
+    let field_ident = field.ident.as_ref().unwrap();
+    let field_name = field_ident.to_string();
 
-            let opts = match PropertyOpts::from_attributes(&field.attrs) {
-                Ok(opts) => opts,
-                Err(err) => return err.write_errors(),
+    let opts = match PropertyOpts::from_attributes(&field.attrs) {
+        Ok(opts) => opts,
+        Err(err) => return err.write_errors(),
+    };
+
+    let variant_value = quote_spanned!(field.ty.span()=> #godot_types::prelude::FromGodot::try_from_variant(&value));
+
+    let assignment = match opts.set {
+        Some(setter) => quote_spanned!(setter.span()=> #setter(self, local_value)),
+        None => quote_spanned!(field.ty.span() => self.#field_ident = local_value),
+    };
+
+    quote! {
+        #field_name => {
+            let local_value = match #variant_value {
+                Ok(v) => v,
+                Err(_) => return false,
             };
 
-            let variant_value = quote_spanned!(field.ty.span()=> #godot_types::prelude::FromGodot::try_from_variant(&value));
+            #assignment;
+            true
+        },
+    }
+}
 
-            let assignment = match opts.set {
-                Some(setter) => quote_spanned!(setter.span()=> #setter(self, local_value)),
-                None => quote_spanned!(field.ty.span() => self.#field_ident = local_value),
-            };
-
-            quote! {
-                #field_name => {
-                    let local_value = match #variant_value {
-                        Ok(v) => v,
-                        Err(_) => return false,
-                    };
-
-                    #assignment;
-                    true
-                },
-            }
-        })
-        .collect();
+fn derive_set_fields(set_field_dispatch: TokenStream) -> TokenStream {
+    let string_name_ty = string_name_ty();
+    let variant_ty = variant_ty();
 
     quote! {
         fn set(&mut self, name: #string_name_ty, value: #variant_ty) -> bool {
@@ -341,23 +340,24 @@ fn derive_set_fields<'a>(public_fields: impl Iterator<Item = &'a SpannedValue<Fi
     }
 }
 
-fn derive_property_states_export<'a>(
-    public_fields: impl Iterator<Item = &'a SpannedValue<FieldOpts>> + 'a,
-) -> TokenStream {
+fn derive_property_state_export(field: &SpannedValue<FieldOpts>) -> TokenStream {
+    let string_name_ty = string_name_ty();
+
+    let Some(ident) = field.ident.as_ref() else {
+        return Default::default();
+    };
+
+    let field_name = ident.to_string();
+    let field_string_name = quote!(#string_name_ty::from(#field_name));
+
+    quote! {
+        (#field_string_name, self.get(#field_string_name).unwrap()),
+    }
+}
+
+fn derive_property_states_export(fetch_property_states: TokenStream) -> TokenStream {
     let string_name_ty = string_name_ty();
     let variant_ty = variant_ty();
-
-    let fetch_property_states: TokenStream = public_fields
-        .filter_map(|field| field.ident.as_ref())
-        .map(|field| {
-            let field_name = field.to_string();
-            let field_string_name = quote!(#string_name_ty::from(#field_name));
-
-            quote! {
-                (#field_string_name, self.get(#field_string_name).unwrap()),
-            }
-        })
-        .collect();
 
     quote! {
         fn property_state(&self) -> ::std::collections::HashMap<#string_name_ty, #variant_ty> {
@@ -366,6 +366,49 @@ fn derive_property_states_export<'a>(
             ])
         }
     }
+}
+
+fn derive_field_metadata(
+    field: &SpannedValue<FieldOpts>,
+    is_exported: bool,
+) -> Result<TokenStream, TokenStream> {
+    let property_hint_ty = property_hints();
+    let name = field
+        .ident
+        .as_ref()
+        .map(|field| field.to_string())
+        .unwrap_or_default();
+
+    let ty = rust_to_variant_type(&field.ty)?;
+
+    let (hint, hint_string) = is_exported
+        .then(|| {
+            let ops =
+                FieldExportOps::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
+
+            ops.hint(&field.ty)
+        })
+        .transpose()?
+        .unwrap_or_else(|| {
+            (
+                quote_spanned!(field.span()=> #property_hint_ty::NONE),
+                quote_spanned!(field.span()=> String::new()),
+            )
+        });
+
+    let description = get_field_description(field);
+    let item = quote! {
+        ::godot_rust_script::private_export::RustScriptPropDesc {
+            name: #name,
+            ty: #ty,
+            exported: #is_exported,
+            hint: #hint,
+            hint_string: #hint_string,
+            description: concat!(#description),
+        },
+    };
+
+    Ok(item)
 }
 
 fn get_field_description(field: &FieldOpts) -> Option<TokenStream> {
@@ -385,6 +428,24 @@ fn get_field_description(field: &FieldOpts) -> Option<TokenStream> {
             acc.extend(comment);
             acc
         })
+}
+
+fn derive_signal_metadata(field: &SpannedValue<FieldOpts>) -> TokenStream {
+    let signal_name = field
+        .ident
+        .as_ref()
+        .map(|ident| ident.to_string())
+        .unwrap_or_default();
+    let signal_description = get_field_description(field);
+    let signal_type = &field.ty;
+
+    quote! {
+        ::godot_rust_script::private_export::RustScriptSignalDesc {
+            name: #signal_name,
+            arguments: <#signal_type as ::godot_rust_script::ScriptSignal>::argument_desc(),
+            description: concat!(#signal_description),
+        },
+    }
 }
 
 #[proc_macro_attribute]

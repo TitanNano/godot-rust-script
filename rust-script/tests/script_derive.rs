@@ -30,7 +30,10 @@ struct TestScript {
     pub enum_prop: u8,
 
     #[signal]
-    changed: Signal<(u8, u8)>,
+    pub changed: Signal<()>,
+
+    #[signal]
+    pub ready: Signal<(u32, u32)>,
 
     pub node_prop: Option<Gd<Node3D>>,
 
