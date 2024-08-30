@@ -372,6 +372,7 @@ fn derive_field_metadata(
     field: &SpannedValue<FieldOpts>,
     is_exported: bool,
 ) -> Result<TokenStream, TokenStream> {
+    let godot_types = godot_types();
     let property_hint_ty = property_hints();
     let name = field
         .ident
@@ -379,6 +380,7 @@ fn derive_field_metadata(
         .map(|field| field.to_string())
         .unwrap_or_default();
 
+    let rust_ty = &field.ty;
     let ty = rust_to_variant_type(&field.ty)?;
 
     let (hint, hint_string) = is_exported
@@ -401,6 +403,7 @@ fn derive_field_metadata(
         ::godot_rust_script::private_export::RustScriptPropDesc {
             name: #name,
             ty: #ty,
+            class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_name(),
             exported: #is_exported,
             hint: #hint,
             hint_string: #hint_string,

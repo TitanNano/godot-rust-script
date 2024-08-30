@@ -57,6 +57,7 @@ pub fn godot_script_impl(
                 .enumerate()
                 .map(|(index, arg)| {
                     let arg_name = arg.pat.as_ref();
+                    let arg_rust_type = arg.ty.as_ref();
                     let arg_type = rust_to_variant_type(arg.ty.as_ref()).unwrap();
 
                     is_context_type(arg.ty.as_ref()).then(|| {
@@ -72,6 +73,7 @@ pub fn godot_script_impl(
                                 ::godot_rust_script::private_export::RustScriptPropDesc {
                                     name: stringify!(#arg_name),
                                     ty: #arg_type,
+                                    class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_name(),
                                     exported: false,
                                     hint: #property_hints::NONE,
                                     hint_string: String::new(),
@@ -132,6 +134,7 @@ pub fn godot_script_impl(
                     return_type: ::godot_rust_script::private_export::RustScriptPropDesc {
                         name: #fn_name_str,
                         ty: #fn_return_ty,
+                        class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_name(),
                         exported: false,
                         hint: #property_hints::NONE,
                         hint_string: String::new(),
