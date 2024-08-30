@@ -80,6 +80,7 @@ pub enum RegistryItem {
 pub struct RustScriptPropDesc {
     pub name: &'static str,
     pub ty: VariantType,
+    pub class_name: ClassName,
     pub exported: bool,
     pub hint: PropertyHint,
     pub hint_string: String,
@@ -87,10 +88,10 @@ pub struct RustScriptPropDesc {
 }
 
 impl RustScriptPropDesc {
-    pub fn to_property_info(&self, class_name: &'static str) -> RustScriptPropertyInfo {
+    pub fn to_property_info(&self) -> RustScriptPropertyInfo {
         RustScriptPropertyInfo {
             variant_type: self.ty,
-            class_name,
+            class_name: self.class_name,
             property_name: self.name,
             usage: if self.exported {
                 (PropertyUsageFlags::EDITOR | PropertyUsageFlags::STORAGE).ord()
@@ -118,12 +119,12 @@ impl RustScriptMethodDesc {
             id,
             method_name: self.name,
             class_name,
-            return_type: self.return_type.to_property_info(class_name),
+            return_type: self.return_type.to_property_info(),
             flags: self.flags.ord(),
             arguments: self
                 .arguments
                 .iter()
-                .map(|arg| arg.to_property_info(class_name))
+                .map(|arg| arg.to_property_info())
                 .collect(),
             description: self.description,
         }
@@ -143,7 +144,7 @@ impl From<RustScriptSignalDesc> for RustScriptSignalInfo {
             arguments: value
                 .arguments
                 .iter()
-                .map(|arg| arg.to_property_info("\0"))
+                .map(|arg| arg.to_property_info())
                 .collect(),
             description: value.description,
         }
@@ -174,7 +175,7 @@ pub fn assemble_metadata<'a>(
         .map(|class| {
             let props = (class.properties)()
                 .into_iter()
-                .map(|prop| prop.to_property_info(class.class_name))
+                .map(|prop| prop.to_property_info())
                 .collect();
 
             let methods = methods
@@ -210,7 +211,7 @@ pub fn assemble_metadata<'a>(
 pub struct RustScriptPropertyInfo {
     pub variant_type: VariantType,
     pub property_name: &'static str,
-    pub class_name: &'static str,
+    pub class_name: ClassName,
     pub hint: i32,
     pub hint_string: String,
     pub usage: u64,
@@ -222,7 +223,7 @@ impl From<&RustScriptPropertyInfo> for PropertyInfo {
         Self {
             variant_type: value.variant_type,
             property_name: value.property_name.into(),
-            class_name: ClassName::from_ascii_cstr(value.class_name.as_bytes()),
+            class_name: value.class_name,
             hint: PropertyHint::try_from_ord(value.hint).unwrap_or(PropertyHint::NONE),
             hint_string: value.hint_string.to_godot(),
             usage: PropertyUsageFlags::try_from_ord(value.usage)

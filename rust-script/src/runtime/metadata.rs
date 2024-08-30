@@ -6,7 +6,7 @@
 
 use std::ops::Deref;
 
-use godot::meta::{MethodInfo, PropertyInfo};
+use godot::meta::{ClassName, MethodInfo, PropertyInfo};
 use godot::obj::{EngineBitfield, EngineEnum};
 use godot::prelude::{Array, Dictionary};
 use godot::sys::VariantType;
@@ -93,6 +93,13 @@ fn variant_type_to_str(var_type: VariantType) -> &'static str {
     }
 }
 
+fn prop_doc_type(prop_type: VariantType, class_name: ClassName) -> &'static str {
+    match prop_type {
+        VariantType::OBJECT => class_name.as_str(),
+        _ => variant_type_to_str(prop_type),
+    }
+}
+
 pub trait ToMethodDoc {
     fn to_method_doc(&self) -> Dictionary;
 }
@@ -109,7 +116,7 @@ impl ToMethodDoc for MethodInfo {
             dict.set("name", self.method_name.clone());
             dict.set(
                 "return_type",
-                variant_type_to_str(self.return_type.variant_type),
+                prop_doc_type(self.return_type.variant_type, self.return_type.class_name),
             );
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
@@ -184,7 +191,7 @@ impl ToArgumentDoc for PropertyInfo {
     fn to_argument_doc(&self) -> Dictionary {
         Dictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
-            dict.set("type", variant_type_to_str(self.variant_type));
+            dict.set("type", prop_doc_type(self.variant_type, self.class_name));
         })
     }
 }
@@ -205,7 +212,7 @@ impl ToPropertyDoc for PropertyInfo {
     fn to_property_doc(&self) -> Dictionary {
         Dictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
-            dict.set("type", variant_type_to_str(self.variant_type));
+            dict.set("type", prop_doc_type(self.variant_type, self.class_name));
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
         })
