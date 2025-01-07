@@ -50,7 +50,7 @@ pub(crate) struct RustScript {
 impl RustScript {
     pub fn new(class_name: String) -> Gd<Self> {
         let mut inst: Gd<Self> = ClassDb::singleton()
-            .instantiate(<Self as GodotClass>::class_name().to_string_name())
+            .instantiate(&<Self as GodotClass>::class_name().to_string_name())
             .to();
 
         inst.bind_mut().class_name = GString::from(class_name);
@@ -113,7 +113,7 @@ impl RustScript {
                 let result: Option<Gd<Object>> = Gd::try_from_instance_id(id).ok();
                 result
             })
-            .map(|gd_ref| godot::global::weakref(gd_ref.to_variant()).to())
+            .map(|gd_ref| godot::global::weakref(&gd_ref.to_variant()).to())
             .collect();
     }
 
@@ -134,11 +134,11 @@ impl RustScript {
             return;
         }
 
-        if !base.has_method("_init".into()) {
+        if !base.has_method("_init") {
             return;
         }
 
-        base.call(StringName::from("_init"), &[]);
+        base.call("_init", &[]);
     }
 }
 
@@ -190,7 +190,7 @@ impl IScriptExtension for RustScript {
     unsafe fn instance_create(&self, mut for_object: Gd<Object>) -> *mut c_void {
         self.owners
             .borrow_mut()
-            .push(godot::global::weakref(for_object.to_variant()).to());
+            .push(godot::global::weakref(&for_object.to_variant()).to());
 
         let data = self.create_remote_instance(for_object.clone());
         let instance = RustScriptInstance::new(data, for_object.clone(), self.to_gd());
@@ -199,9 +199,9 @@ impl IScriptExtension for RustScript {
 
         for_object
             .connect_ex(
-                StringName::from("script_changed"),
-                Callable::from_object_method(&self.to_gd(), "init_script_instance")
-                    .bindv(callbale_args),
+                "script_changed",
+                &Callable::from_object_method(&self.to_gd(), "init_script_instance")
+                    .bindv(&callbale_args),
             )
             .flags(ConnectFlags::ONE_SHOT.ord() as u32)
             .done();
@@ -212,7 +212,7 @@ impl IScriptExtension for RustScript {
     unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
         self.owners
             .borrow_mut()
-            .push(godot::global::weakref(for_object.to_variant()).to());
+            .push(godot::global::weakref(&for_object.to_variant()).to());
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
@@ -224,7 +224,13 @@ impl IScriptExtension for RustScript {
     }
 
     fn has_property_default_value(&self, _property: StringName) -> bool {
+        // default values are currently not exposed
         false
+    }
+
+    fn get_property_default_value(&self, #[expect(unused)] property: StringName) -> Variant {
+        // default values are currently not exposed
+        Variant::nil()
     }
 
     fn get_script_signal_list(&self) -> Array<Dictionary> {
@@ -302,7 +308,6 @@ impl IScriptExtension for RustScript {
     fn get_constants(&self) -> Dictionary {
         Dictionary::new()
     }
-
     fn get_method_info(&self, method_name: StringName) -> Dictionary {
         let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
 
@@ -401,11 +406,11 @@ impl IScriptExtension for RustScript {
             };
 
             // clear script to destroy script instance.
-            object.set_script(Variant::nil());
+            object.set_script(&Variant::nil());
 
             self.downgrade_gd(|self_gd| {
                 // re-assign script to create new instance.
-                object.set_script(self_gd.to_variant());
+                object.set_script(&self_gd.to_variant());
             })
         });
 
@@ -425,5 +430,56 @@ impl IScriptExtension for RustScript {
 
     fn has_source_code(&self) -> bool {
         false
+    }
+
+    fn inherits_script(&self, #[expect(unused)] script: Gd<Script>) -> bool {
+        false
+    }
+
+    fn instance_has(&self, object: Gd<Object>) -> bool {
+        #[expect(unused)]
+        let Some(script): Option<Gd<RustScript>> = object.get_script().try_to().ok() else {
+            return false;
+        };
+
+        true
+    }
+
+    #[cfg(since_api = "4.2")]
+    fn has_static_method(&self, #[expect(unused)] method: StringName) -> bool {
+        // static methods are currently not supported
+        false
+    }
+
+    fn get_member_line(&self, #[expect(unused)] member: StringName) -> i32 {
+        0
+    }
+
+    fn get_members(&self) -> Array<StringName> {
+        let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
+
+        reg.get(&self.str_class_name())
+            .map(|class| {
+                class
+                    .properties()
+                    .iter()
+                    .map(|prop| StringName::from(prop.property_name))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    fn is_placeholder_fallback_enabled(&self) -> bool {
+        false
+    }
+
+    fn get_rpc_config(&self) -> Variant {
+        godot_warn!("godot-rust-script: rpc config is unsupported!");
+        Variant::nil()
+    }
+
+    #[cfg(since_api = "4.4")]
+    fn get_doc_class_name(&self) -> StringName {
+        self.class_name.clone().into()
     }
 }

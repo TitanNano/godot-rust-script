@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::builtin::{Array, GString, StringName};
+use godot::builtin::{Array, GString};
 use godot::classes::{Node, Node3D};
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{godot_script_impl, Context, GodotScript, GodotScriptEnum, Signal};
@@ -65,11 +65,11 @@ impl TestScript {
         let mut base = self.base.clone();
 
         ctx.reentrant_scope(self, || {
-            base.emit_signal(StringName::from("hit"), &[]);
+            base.emit_signal("hit", &[]);
         });
 
         ctx.reentrant_scope(self, |mut base: Gd<Node>| {
-            base.set_owner(Node::new_alloc());
+            base.set_owner(&Node::new_alloc());
         });
 
         result

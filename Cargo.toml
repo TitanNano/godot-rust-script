@@ -10,15 +10,16 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-godot = { git = "https://github.com/godot-rust/gdext", tag = "v0.1.3", features = ["experimental-threads"] }
-godot-cell = { git = "https://github.com/godot-rust/gdext", tag = "v0.1.3" }
-itertools = "0.10.3"
-rand = "0.8.5"
+godot = { version = "0.2", features = ["experimental-threads"] }
+godot-cell = "0.2"
+godot-bindings = "0.2"
+itertools = "0.10"
+rand = "0.8"
 darling = { version = "0.20" }
-proc-macro2 = "1.0.68"
+proc-macro2 = "1.0"
 quote = "1"
 syn = "2"
-const-str = "0.5.6"
+const-str = "0.5"
 thiserror = "1"
 
 godot-rust-script-derive = { path = "derive" }

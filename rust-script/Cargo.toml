@@ -21,6 +21,9 @@ thiserror.workspace = true
 tests-scripts-lib = { path = "../tests-scripts-lib" }
 godot-rust-script = { path = "./", features = ["runtime"] }
 
+[build-dependencies]
+godot-bindings.workspace = true
+
 [features]
 default = ["runtime", "scripts"]
 runtime = ["dep:itertools", "dep:rand"]

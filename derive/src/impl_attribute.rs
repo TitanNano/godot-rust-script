@@ -292,7 +292,7 @@ fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
 
             quote_spanned! { func.span() =>
                 #func {
-                    (*self).call(#func_name.into(), &[#args]).to()
+                    (*self).call(#func_name, &[#args]).to()
                 }
             }
         })

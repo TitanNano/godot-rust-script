@@ -22,7 +22,7 @@ pub(super) struct RustScriptResourceLoader {
 impl RustScriptResourceLoader {
     pub fn new(script_lang: Gd<RustScriptLanguage>) -> Gd<Self> {
         let mut inst: Gd<Self> = ClassDb::singleton()
-            .instantiate(StringName::from("RustScriptResourceLoader"))
+            .instantiate("RustScriptResourceLoader")
             .to();
 
         inst.bind_mut().script_lang = Some(script_lang);

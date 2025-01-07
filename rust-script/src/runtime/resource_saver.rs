@@ -4,10 +4,12 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use std::option::Option;
+
 use godot::classes::{
     file_access, resource_saver::SaverFlags, FileAccess, IResourceFormatSaver, Script,
 };
-use godot::global;
+use godot::global::{self, godot_warn};
 use godot::obj::EngineBitfield;
 use godot::prelude::{
     godot_api, godot_print, GString, Gd, GodotClass, PackedStringArray, Resource,
@@ -21,20 +23,25 @@ pub struct RustScriptResourceSaver;
 
 #[godot_api]
 impl IResourceFormatSaver for RustScriptResourceSaver {
-    fn save(&mut self, resource: Gd<Resource>, path: GString, flags: u32) -> global::Error {
+    fn save(&mut self, resource: Option<Gd<Resource>>, path: GString, flags: u32) -> global::Error {
+        let Some(resource) = resource else {
+            godot_warn!("RustScriptResourceSaver: Unable to save a None resource!");
+            return global::Error::FAILED;
+        };
+
         let mut script: Gd<Script> = resource.cast();
 
         godot_print!("saving rust script resource to: {}", path);
 
         if flags as u64 & SaverFlags::CHANGE_PATH.ord() > 0 {
-            script.set_path(path.clone());
+            script.set_path(&path);
         }
 
         if !script.has_source_code() {
             return global::Error::OK;
         }
 
-        let handle = FileAccess::open(path, file_access::ModeFlags::WRITE);
+        let handle = FileAccess::open(&path, file_access::ModeFlags::WRITE);
 
         let mut handle = match handle {
             Some(handle) => handle,
@@ -43,18 +50,23 @@ impl IResourceFormatSaver for RustScriptResourceSaver {
             }
         };
 
-        handle.store_string(script.get_source_code());
+        handle.store_string(&script.get_source_code());
         handle.close();
 
         global::Error::OK
     }
-    fn recognize(&self, resource: Gd<Resource>) -> bool {
-        resource.try_cast::<RustScript>().is_ok()
+
+    fn recognize(&self, resource: Option<Gd<Resource>>) -> bool {
+        resource
+            .map(|res| res.try_cast::<RustScript>().is_ok())
+            .unwrap_or(false)
     }
-    fn get_recognized_extensions(&self, _resource: Gd<Resource>) -> PackedStringArray {
+
+    fn get_recognized_extensions(&self, _resource: Option<Gd<Resource>>) -> PackedStringArray {
         PackedStringArray::from(&[GString::from("rs")])
     }
-    fn recognize_path(&self, _resource: Gd<Resource>, _path: GString) -> bool {
+
+    fn recognize_path(&self, _resource: Option<Gd<Resource>>, _path: GString) -> bool {
         true
     }
 }

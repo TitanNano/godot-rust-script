@@ -22,13 +22,13 @@ pub struct Context<'a, Script: GodotScriptImpl + ?Sized> {
     base_type: PhantomData<Script>,
 }
 
-impl<'a, Script: GodotScriptImpl> Debug for Context<'a, Script> {
+impl<Script: GodotScriptImpl> Debug for Context<'_, Script> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Context { <Call Context> }")
     }
 }
 
-impl<'a, Script: GodotScriptImpl> Context<'a, Script> {
+impl<Script: GodotScriptImpl> Context<'_, Script> {
     pub fn reentrant_scope<T: GodotScriptObject + 'static, Args, Return>(
         &mut self,
         self_ref: &mut T,
