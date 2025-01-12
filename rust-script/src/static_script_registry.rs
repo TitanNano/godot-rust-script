@@ -22,6 +22,7 @@ use crate::runtime::GodotScriptObject;
 godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 
 #[macro_export]
+#[cfg(before_api = "4.4")]
 macro_rules! register_script_class {
     ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr) => {
         $crate::private_export::plugin_add! {
@@ -29,6 +30,28 @@ macro_rules! register_script_class {
             $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
                 class_name: stringify!($class_name),
                 class_name_cstr: ::std::ffi::CStr::from_bytes_with_nul(concat!(stringify!($class_name), "\0").as_bytes()).unwrap(),
+                base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_name().to_cow_str(),
+                properties: || {
+                    $props
+                },
+                signals: || {
+                    $signals
+                },
+                create_data: $crate::private_export::create_default_data_struct::<$class_name>,
+                description: $desc,
+            })
+        }
+    };
+}
+
+#[macro_export]
+#[cfg(since_api = "4.4")]
+macro_rules! register_script_class {
+    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr) => {
+        $crate::private_export::plugin_add! {
+        SCRIPT_REGISTRY in $crate::private_export;
+            $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
+                class_name: stringify!($class_name),
                 base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_name().to_cow_str(),
                 properties: || {
                     $props

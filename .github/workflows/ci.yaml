@@ -17,6 +17,9 @@ jobs:
     runs-on: "ubuntu-22.04"
     env:
       RUSTFLAGS: "-D warnings"
+    strategy:
+      matrix:
+        api_version: ["4-1", "4-2", "4-3"]
 
     steps:
     - name: Checkout
@@ -30,19 +33,11 @@ jobs:
     - name: Build Debug
       run: |
         set -o pipefail
-        cargo build --workspace --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
-    - name: Build Debug Runtime
-      run: |
-        set -o pipefail
-        cargo build -p godot-rust-script --features "runtime" --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
-    - name: Build Debug Scripts
-      run: |
-        set -o pipefail
-        cargo build -p godot-rust-script --features "scripts" --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
+        cargo build --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
     - name: Build Release
       run: |
         set -o pipefail
-        cargo build --release --workspace --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
+        cargo build --release --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
     - name: Upload Results
       uses: github/codeql-action/upload-sarif@v2
       if: ${{ always() }}
@@ -52,6 +47,9 @@ jobs:
 
   clippy:
     runs-on: "ubuntu-22.04"
+    strategy:
+      matrix:
+        api_version: ["4-1", "4-2", "4-3"]
 
     steps:
       - name: Checkout
@@ -65,9 +63,9 @@ jobs:
       - name: Checks
         run: |
           set -o pipefail
-          cargo clippy --message-format json --workspace --all-features -- -D warnings | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
+          cargo clippy --message-format json --workspace --all-features --features "godot/api-${{ matrix.api_version}}" -- -D warnings | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
       - name: Upload Results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         if: ${{ always() }}
         with:
           sarif_file: rust-clippy-results.sarif
@@ -75,17 +73,39 @@ jobs:
 
   tests:
     runs-on: "ubuntu-22.04"
+    strategy:
+      matrix:
+        api_version: ["4-1", "4-2", "4-3", "custom"]
 
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Tests
+
+      - name: Install ENV
         run: |
-          cargo test
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install nushell
+
+      - name: Download Godot Prerelease
+        id: prerelease_setup
+        if: ${{ matrix.api_version == 'custom' }}
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          brew install llvm
+          GODOT4_BIN="$(./download_godot_dev.nu)"
+          echo "godot4_bin=$GODOT4_BIN" >> "$GITHUB_OUTPUT"
+
+      - name: Tests
+        env:
+          LLVM_PATH: "/home/linuxbrew/.linuxbrew/opt/llvm/bin"
+          GODOT4_BIN: ${{ steps.prerelease_setup.outputs.godot4_bin }}
+        run: |
+          cargo test --features "godot/api-${{ matrix.api_version}}" 
 
   license:
     runs-on: "ubuntu-22.04"
