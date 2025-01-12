@@ -4,18 +4,22 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::ffi::OsStr;
+use std::ffi::{c_void, OsStr};
 
+use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
+#[cfg(since_api = "4.3")]
+use godot::classes::script_language::ScriptNameCasing;
 use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
 use godot::global;
 use godot::obj::Base;
 use godot::prelude::{
-    godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray, VariantArray,
+    godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray, StringName,
+    Variant, VariantArray,
 };
 use itertools::Itertools;
 
 use crate::apply::Apply;
-use crate::editor_ui_hacks::{show_editor_toast, EditorToaserSeverity};
+use crate::editor_ui_hacks::{show_editor_toast, EditorToasterSeverity};
 use crate::static_script_registry::RustScriptMetaData;
 
 use super::{rust_script::RustScript, SCRIPT_REGISTRY};
@@ -54,7 +58,7 @@ impl RustScriptLanguage {
 
     pub fn singleton() -> Option<Gd<Self>> {
         Engine::singleton()
-            .get_singleton(RustScriptLanguage::class_name().to_string_name())
+            .get_singleton(&RustScriptLanguage::class_name().to_string_name())
             .map(|gd| gd.cast())
     }
 
@@ -104,7 +108,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     }
 
     /// frame hook will be called for each reandered frame
-    /// fn frame(&mut self) {}
+    fn frame(&mut self) {}
 
     fn handles_global_class_type(&self, type_: GString) -> bool {
         type_ == self.get_type()
@@ -140,7 +144,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     fn validate_path(&self, path: GString) -> GString {
         let Some(rs_root) = self
             .scripts_src_dir
-            .map(|path| ProjectSettings::singleton().localize_path(path.into()))
+            .map(|path| ProjectSettings::singleton().localize_path(path))
         else {
             return GString::from("Unable to validate script location! RustScript source location is known in the current execution context.");
         };
@@ -149,7 +153,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
             return GString::from("rust file is not part of the scripts crate!");
         }
 
-        if !FileAccess::file_exists(path.clone()) {
+        if !FileAccess::file_exists(&path) {
             return GString::from("RustScripts can not be created via the Godot editor!");
         }
 
@@ -196,13 +200,13 @@ impl IScriptLanguageExtension for RustScriptLanguage {
 
     fn open_in_external_editor(
         &mut self,
-        _script: Gd<Script>,
+        _script: Option<Gd<Script>>,
         _line: i32,
         _col: i32,
     ) -> global::Error {
         show_editor_toast(
             "Editing rust scripts from inside Godot is currently not supported.",
-            EditorToaserSeverity::Warning,
+            EditorToasterSeverity::Warning,
         );
 
         global::Error::OK
@@ -235,10 +239,183 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         validation
     }
 
+    // godot hook to trigger script reload
+    fn reload_all_scripts(&mut self) {}
+
+    fn init_ext(&mut self) {}
+
+    fn finish(&mut self) {}
+
+    fn is_control_flow_keyword(&self, #[expect(unused)] keyword: GString) -> bool {
+        false
+    }
+    fn get_built_in_templates(&self, #[expect(unused)] object: StringName) -> Array<Dictionary> {
+        Array::new()
+    }
+
+    fn find_function(
+        &self,
+        #[expect(unused)] function: GString,
+        #[expect(unused)] code: GString,
+    ) -> i32 {
+        0
+    }
+
+    #[expect(unused_variables)]
+    fn make_function(
+        &self,
+        class_name: GString,
+        function_name: GString,
+        function_args: PackedStringArray,
+    ) -> GString {
+        GString::new()
+    }
+
+    #[cfg(since_api = "4.3")]
+    fn can_make_function(&self) -> bool {
+        false
+    }
+
+    #[cfg(since_api = "4.3")]
+    fn preferred_file_name_casing(&self) -> ScriptNameCasing {
+        ScriptNameCasing::SNAKE_CASE
+    }
+
+    #[expect(unused_variables)]
+    fn complete_code(&self, code: GString, path: GString, owner: Option<Gd<Object>>) -> Dictionary {
+        Dictionary::new()
+    }
+
+    #[expect(unused_variables)]
+    fn lookup_code(
+        &self,
+        code: GString,
+        symbol: GString,
+        path: GString,
+        owner: Option<Gd<Object>>,
+    ) -> Dictionary {
+        Dictionary::new()
+    }
+
+    fn auto_indent_code(
+        &self,
+        code: GString,
+        #[expect(unused)] from_line: i32,
+        #[expect(unused)] to_line: i32,
+    ) -> GString {
+        code
+    }
+
+    #[expect(unused_variables)]
+    fn add_global_constant(&mut self, name: StringName, value: Variant) {}
+
+    #[expect(unused_variables)]
+    fn add_named_global_constant(&mut self, name: StringName, value: Variant) {}
+
+    #[expect(unused_variables)]
+    fn remove_named_global_constant(&mut self, name: StringName) {}
+
+    fn debug_get_error(&self) -> GString {
+        GString::new()
+    }
+
+    fn debug_get_stack_level_count(&self) -> i32 {
+        0
+    }
+
+    #[expect(unused_variables)]
+    fn debug_get_stack_level_line(&self, level: i32) -> i32 {
+        0
+    }
+
+    #[expect(unused_variables)]
+    fn debug_get_stack_level_function(&self, level: i32) -> GString {
+        GString::new()
+    }
+
+    #[cfg(since_api = "4.3")]
+    #[expect(unused_variables)]
+    fn debug_get_stack_level_source(&self, level: i32) -> GString {
+        GString::new()
+    }
+
+    #[expect(unused_variables)]
+    fn debug_get_stack_level_locals(
+        &mut self,
+        level: i32,
+        max_subitems: i32,
+        max_depth: i32,
+    ) -> Dictionary {
+        Dictionary::new()
+    }
+
+    #[expect(unused_variables)]
+    fn debug_get_stack_level_members(
+        &mut self,
+        level: i32,
+        max_subitems: i32,
+        max_depth: i32,
+    ) -> Dictionary {
+        Dictionary::new()
+    }
+
+    #[expect(unused_variables)]
+    unsafe fn debug_get_stack_level_instance(&mut self, level: i32) -> *mut c_void {
+        unimplemented!("debugging is not implemented!");
+    }
+
+    #[expect(unused_variables)]
+    fn debug_get_globals(&mut self, max_subitems: i32, max_depth: i32) -> Dictionary {
+        Dictionary::new()
+    }
+
+    #[expect(unused_variables)]
+    fn debug_parse_stack_level_expression(
+        &mut self,
+        level: i32,
+        expression: GString,
+        max_subitems: i32,
+        max_depth: i32,
+    ) -> GString {
+        GString::new()
+    }
+
     fn debug_get_current_stack_info(&mut self) -> Array<Dictionary> {
         Array::default()
     }
 
-    // godot hook to trigger script reload
-    fn reload_all_scripts(&mut self) {}
+    #[expect(unused_variables)]
+    fn reload_tool_script(&mut self, script: Option<Gd<Script>>, soft_reload: bool) {}
+    fn profiling_start(&mut self) {}
+    fn profiling_stop(&mut self) {}
+
+    #[cfg(since_api = "4.3")]
+    #[expect(unused_variables)]
+    fn profiling_set_save_native_calls(&mut self, enable: bool) {}
+
+    #[expect(unused_variables)]
+    unsafe fn profiling_get_accumulated_data(
+        &mut self,
+        info_array: *mut ScriptLanguageExtensionProfilingInfo,
+        info_max: i32,
+    ) -> i32 {
+        0
+    }
+
+    #[expect(unused_variables)]
+    unsafe fn profiling_get_frame_data(
+        &mut self,
+        info_array: *mut ScriptLanguageExtensionProfilingInfo,
+        info_max: i32,
+    ) -> i32 {
+        0
+    }
+
+    #[cfg(since_api = "4.4")]
+    #[expect(unused_variables)]
+    fn reload_scripts(&mut self, scripts: Array<Variant>, soft: bool) {
+        use godot::global::godot_warn;
+
+        godot_warn!("Reloading Rust Scripts is currently a no-op!");
+    }
 }

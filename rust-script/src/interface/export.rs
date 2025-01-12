@@ -13,7 +13,7 @@ use godot::builtin::{
     Rect2, Rect2i, Rid, StringName, Transform2D, Transform3D, Vector2, Vector2i, Vector3, Vector3i,
     Vector4, Vector4i,
 };
-use godot::engine::{Node, Resource};
+use godot::classes::{Node, Resource};
 use godot::global::PropertyHint;
 use godot::meta::{ArrayElement, FromGodot, GodotConvert, GodotType, ToGodot};
 use godot::obj::{EngineEnum, Gd};
@@ -32,7 +32,7 @@ impl<T: GodotClass> GodotScriptExport for Gd<T> {
             return custom;
         }
 
-        T::class_name().as_str().to_owned()
+        T::class_name().to_string()
     }
 
     fn hint(custom: Option<PropertyHint>) -> PropertyHint {
@@ -52,7 +52,11 @@ impl<T: GodotClass> GodotScriptExport for Gd<T> {
 
 impl<T: GodotScriptExport> GodotScriptExport for Option<T>
 where
+    for<'v> T: 'v,
+    for<'v> <<T as ToGodot>::ToVia<'v> as GodotType>::Ffi: godot::sys::GodotNullableFfi,
+    for<'f> <<T as GodotConvert>::Via as GodotType>::ToFfi<'f>: godot::sys::GodotNullableFfi,
     <<T as GodotConvert>::Via as GodotType>::Ffi: godot::sys::GodotNullableFfi,
+    for<'v, 'f> <<T as ToGodot>::ToVia<'v> as GodotType>::ToFfi<'f>: godot::sys::GodotNullableFfi,
 {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
         T::hint_string(custom_hint, custom_string)
@@ -63,7 +67,7 @@ where
     }
 }
 
-impl<T: ArrayElement + GodotScriptExport> GodotScriptExport for Array<T> {
+impl<T: ArrayElement + GodotScriptExport + GodotType> GodotScriptExport for Array<T> {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
         let element_type = <<T as GodotType>::Ffi as GodotFfi>::variant_type().ord();
         let element_hint = <T as GodotScriptExport>::hint(custom_hint).ord();

@@ -4,6 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use std::borrow::Cow;
 use std::ops::Deref;
 
 use godot::meta::{ClassName, MethodInfo, PropertyInfo};
@@ -24,8 +25,8 @@ impl ToDictionary for PropertyInfo {
         dict.set("name", self.property_name.clone());
         dict.set("class_name", self.class_name.to_string_name());
         dict.set("type", self.variant_type.ord());
-        dict.set("hint", self.hint.ord());
-        dict.set("hint_string", self.hint_string.clone());
+        dict.set("hint", self.hint_info.hint.ord());
+        dict.set("hint_string", self.hint_info.hint_string.clone());
         dict.set("usage", self.usage.ord());
 
         dict
@@ -93,10 +94,10 @@ fn variant_type_to_str(var_type: VariantType) -> &'static str {
     }
 }
 
-fn prop_doc_type(prop_type: VariantType, class_name: ClassName) -> &'static str {
+fn prop_doc_type(prop_type: VariantType, class_name: ClassName) -> Cow<'static, str> {
     match prop_type {
-        VariantType::OBJECT => class_name.as_str(),
-        _ => variant_type_to_str(prop_type),
+        VariantType::OBJECT => class_name.to_cow_str(),
+        _ => variant_type_to_str(prop_type).into(),
     }
 }
 
@@ -116,7 +117,7 @@ impl ToMethodDoc for MethodInfo {
             dict.set("name", self.method_name.clone());
             dict.set(
                 "return_type",
-                prop_doc_type(self.return_type.variant_type, self.return_type.class_name),
+                prop_doc_type(self.return_type.variant_type, self.return_type.class_name).as_ref(),
             );
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
@@ -191,7 +192,10 @@ impl ToArgumentDoc for PropertyInfo {
     fn to_argument_doc(&self) -> Dictionary {
         Dictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
-            dict.set("type", prop_doc_type(self.variant_type, self.class_name));
+            dict.set(
+                "type",
+                prop_doc_type(self.variant_type, self.class_name).as_ref(),
+            );
         })
     }
 }
@@ -212,7 +216,10 @@ impl ToPropertyDoc for PropertyInfo {
     fn to_property_doc(&self) -> Dictionary {
         Dictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
-            dict.set("type", prop_doc_type(self.variant_type, self.class_name));
+            dict.set(
+                "type",
+                prop_doc_type(self.variant_type, self.class_name).as_ref(),
+            );
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
         })

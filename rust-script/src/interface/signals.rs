@@ -160,11 +160,11 @@ impl<T: SignalArguments> ScriptSignal for Signal<T> {
     fn emit(&self, args: Self::Args) {
         self.host
             .clone()
-            .emit_signal(StringName::from(self.name), &args.to_variants());
+            .emit_signal(self.name, &args.to_variants());
     }
 
     fn connect(&mut self, callable: Callable) -> Result<(), Error> {
-        match self.host.connect(self.name.into(), callable) {
+        match self.host.connect(self.name, &callable) {
             Error::OK => Ok(()),
             error => Err(error),
         }
@@ -184,6 +184,11 @@ impl<T: SignalArguments> GodotConvert for Signal<T> {
 }
 
 impl<T: SignalArguments> ToGodot for Signal<T> {
+    type ToVia<'v>
+        = Self::Via
+    where
+        Self: 'v;
+
     fn to_godot(&self) -> Self::Via {
         godot::builtin::Signal::from_object_signal(&self.host, self.name)
     }

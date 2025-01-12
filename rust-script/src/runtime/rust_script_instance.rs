@@ -224,6 +224,14 @@ impl ScriptInstance for RustScriptInstance {
     fn property_set_fallback(_this: SiMut<Self>, _name: StringName, _value: &Variant) -> bool {
         false
     }
+
+    #[cfg(since_api = "4.3")]
+    fn get_method_argument_count(&self, method: StringName) -> Option<u32> {
+        self.method_list
+            .iter()
+            .find(|m| m.method_name == method)
+            .map(|method| method.arguments.len() as u32)
+    }
 }
 
 pub(super) struct RustScriptPlaceholder {
@@ -338,5 +346,13 @@ impl ScriptInstance for RustScriptPlaceholder {
 
     fn property_set_fallback(_this: SiMut<Self>, _name: StringName, _value: &Variant) -> bool {
         false
+    }
+
+    #[cfg(since_api = "4.3")]
+    fn get_method_argument_count(&self, method: StringName) -> Option<u32> {
+        self.method_list
+            .iter()
+            .find(|m| m.method_name == method)
+            .map(|method| method.arguments.len() as u32)
     }
 }
