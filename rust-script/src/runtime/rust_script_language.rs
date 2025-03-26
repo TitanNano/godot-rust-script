@@ -10,7 +10,7 @@ use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
 #[cfg(since_api = "4.3")]
 use godot::classes::script_language::ScriptNameCasing;
 use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
-use godot::global;
+use godot::global::{self, godot_error};
 use godot::obj::Base;
 use godot::prelude::{
     godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray, StringName,
@@ -19,7 +19,6 @@ use godot::prelude::{
 use itertools::Itertools;
 
 use crate::apply::Apply;
-use crate::editor_ui_hacks::{show_editor_toast, EditorToasterSeverity};
 use crate::static_script_registry::RustScriptMetaData;
 
 use super::{rust_script::RustScript, SCRIPT_REGISTRY};
@@ -204,10 +203,8 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         _line: i32,
         _col: i32,
     ) -> global::Error {
-        show_editor_toast(
-            "Editing rust scripts from inside Godot is currently not supported.",
-            EditorToasterSeverity::Warning,
-        );
+        // TODO: From Godot 4.4 we can show an editor toast here. Just waiting for a new gdext release.
+        godot_error!("Editing rust scripts from inside Godot is currently not supported.");
 
         global::Error::OK
     }

@@ -36,6 +36,7 @@ impl ToGodot for EditorToasterSeverity {
     }
 }
 
+#[expect(dead_code)]
 pub fn show_editor_toast(message: &str, severity: EditorToasterSeverity) {
     if !Engine::singleton().is_editor_hint() {
         return;
