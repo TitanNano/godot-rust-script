@@ -8,6 +8,7 @@ let godot_dev_zip = $"($godot_dev_dir).zip"
 
 print -e $"fetching releases from ($GODOT_BUILDS)..."
 let asset = http get $"https://api.github.com/repos/($GODOT_BUILDS)/releases"
+  | sort-by -nr tag_name
   | filter {|item| $item.tag_name | str starts-with "4." }
   | get 0.assets
   | filter {|item| $item.name | str contains "linux.x86_64" }
