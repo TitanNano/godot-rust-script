@@ -8,18 +8,19 @@ use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
 use godot::classes::{
     notify::ObjectNotification, object::ConnectFlags, ClassDb, Engine, IScriptExtension, Object,
-    Script, ScriptExtension, ScriptLanguage, WeakRef,
+    Script, ScriptExtension, ScriptLanguage,
 };
-use godot::global::{godot_error, godot_print, godot_warn};
+use godot::global::{godot_error, godot_print, godot_warn, PropertyUsageFlags};
 use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::script::create_script_instance;
-use godot::obj::{EngineEnum, InstanceId, WithBaseField};
+use godot::obj::{EngineBitfield, EngineEnum, InstanceId, WithBaseField};
 use godot::prelude::{
     godot_api, Array, Base, Callable, Dictionary, GString, Gd, GodotClass, StringName, Variant,
     VariantArray,
 };
 
 use crate::apply::Apply;
+use crate::static_script_registry::RustScriptPropertyInfo;
 
 use super::rust_script_instance::GodotScriptObject;
 use super::{
@@ -38,11 +39,12 @@ pub(crate) struct RustScript {
     #[var(get = get_class_name, set = set_class_name, usage_flags = [STORAGE])]
     class_name: GString,
 
+    /// dummy property that stores the onwer ids when the extension gets reloaded by the engine.
     #[var( get = owner_ids, set = set_owner_ids, usage_flags = [STORAGE])]
     #[allow(dead_code)]
     owner_ids: Array<i64>,
 
-    owners: RefCell<Vec<Gd<WeakRef>>>,
+    owners: RefCell<HashSet<InstanceId>>,
     base: Base<ScriptExtension>,
 }
 
@@ -86,13 +88,7 @@ impl RustScript {
     fn owner_ids(&self) -> Array<i64> {
         let owners = self.owners.borrow();
 
-        let set: HashSet<_> = owners
-            .iter()
-            .filter_map(|item| item.get_ref().to::<Option<Gd<Object>>>())
-            .map(|obj| obj.instance_id().to_i64())
-            .collect();
-
-        set.into_iter().collect()
+        owners.iter().map(|id| id.to_i64()).collect()
     }
 
     #[func]
@@ -103,18 +99,10 @@ impl RustScript {
         }
 
         if !self.owners.borrow().is_empty() {
-            godot_warn!("over writing existing owners of rust script");
+            godot_warn!("overwriting existing owners of rust script");
         }
 
-        *self.owners.borrow_mut() = ids
-            .iter_shared()
-            .map(InstanceId::from_i64)
-            .filter_map(|id| {
-                let result: Option<Gd<Object>> = Gd::try_from_instance_id(id).ok();
-                result
-            })
-            .map(|gd_ref| godot::global::weakref(&gd_ref.to_variant()).to())
-            .collect();
+        *self.owners.borrow_mut() = ids.iter_shared().map(InstanceId::from_i64).collect();
     }
 
     #[func]
@@ -139,6 +127,14 @@ impl RustScript {
         }
 
         base.call("_init", &[]);
+    }
+
+    fn map_property_info_list<R>(&self, f: impl Fn(&RustScriptPropertyInfo) -> R) -> Vec<R> {
+        let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
+
+        reg.get(&self.str_class_name())
+            .map(|class| class.properties().iter().map(f).collect())
+            .unwrap_or_default()
     }
 }
 
@@ -188,9 +184,7 @@ impl IScriptExtension for RustScript {
     }
 
     unsafe fn instance_create(&self, mut for_object: Gd<Object>) -> *mut c_void {
-        self.owners
-            .borrow_mut()
-            .push(godot::global::weakref(&for_object.to_variant()).to());
+        self.owners.borrow_mut().insert(for_object.instance_id());
 
         let data = self.create_remote_instance(for_object.clone());
         let instance = RustScriptInstance::new(data, for_object.clone(), self.to_gd());
@@ -210,9 +204,7 @@ impl IScriptExtension for RustScript {
     }
 
     unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
-        self.owners
-            .borrow_mut()
-            .push(godot::global::weakref(&for_object.to_variant()).to());
+        self.owners.borrow_mut().insert(for_object.instance_id());
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
@@ -393,16 +385,44 @@ impl IScriptExtension for RustScript {
     }
 
     // godot script reload hook
-    fn reload(&mut self, _keep_state: bool) -> godot::global::Error {
-        let owners = self.owners.borrow().clone();
+    fn reload(
+        &mut self,
+        // before 4.4 the engine does not correctly pass the keep_state flag
+        #[cfg_attr(before_api = "4.4", expect(unused_variables))] keep_state: bool,
+    ) -> godot::global::Error {
+        #[cfg(before_api = "4.4")]
+        let keep_state = true;
 
-        owners.iter().for_each(|owner| {
-            let mut object: Gd<Object> = match owner.get_ref().try_to() {
+        let owners = self.owners.borrow().clone();
+        let exported_properties_list = if keep_state {
+            self.map_property_info_list(|prop| {
+                (prop.usage & PropertyUsageFlags::EDITOR.ord() != 0).then_some(prop.property_name)
+            })
+        } else {
+            Vec::with_capacity(0)
+        };
+
+        owners.iter().for_each(|owner_id| {
+            let mut object: Gd<Object> = match Gd::try_from_instance_id(*owner_id) {
                 Ok(owner) => owner,
                 Err(err) => {
                     godot_warn!("Failed to get script owner: {:?}", err);
                     return;
                 }
+            };
+
+            let property_backup: Vec<_> = if keep_state {
+                exported_properties_list
+                    .iter()
+                    .flatten()
+                    .map(|key| {
+                        let value = object.get(*key);
+
+                        (*key, value)
+                    })
+                    .collect()
+            } else {
+                Vec::with_capacity(0)
             };
 
             // clear script to destroy script instance.
@@ -411,6 +431,12 @@ impl IScriptExtension for RustScript {
             self.downgrade_gd(|self_gd| {
                 // re-assign script to create new instance.
                 object.set_script(&self_gd.to_variant());
+
+                if keep_state {
+                    property_backup.into_iter().for_each(|(key, value)| {
+                        object.set(key, &value);
+                    });
+                }
             })
         });
 
@@ -424,7 +450,7 @@ impl IScriptExtension for RustScript {
                 self.str_class_name()
             );
 
-            self.reload(false);
+            self.reload(true);
         }
     }
 
