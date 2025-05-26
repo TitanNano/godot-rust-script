@@ -6,6 +6,7 @@
 
 mod call_context;
 mod downgrade_self;
+mod editor;
 mod metadata;
 mod resource_loader;
 mod resource_saver;
