@@ -13,7 +13,7 @@ use std::{collections::HashMap, fmt::Debug};
 
 use godot::meta::{FromGodot, GodotConvert, ToGodot};
 use godot::obj::Inherits;
-use godot::prelude::{Gd, Object, StringName, Variant};
+use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 
 pub use crate::runtime::Context;
 
@@ -107,6 +107,30 @@ impl<T: GodotScript> Clone for RsRef<T> {
             owner: self.owner.clone(),
             script_ty: PhantomData,
         }
+    }
+}
+
+impl<T: GodotScript> GodotConvert for RsRef<T> {
+    type Via = Gd<T::Base>;
+}
+
+impl<T: GodotScript> FromGodot for RsRef<T>
+where
+    T::Base: Inherits<T::Base>,
+{
+    fn try_from_godot(via: Self::Via) -> Result<Self, godot::prelude::ConvertError> {
+        via.try_to_script().map_err(ConvertError::with_error)
+    }
+}
+
+impl<T: GodotScript> ToGodot for RsRef<T> {
+    type ToVia<'v>
+        = Gd<T::Base>
+    where
+        Self: 'v;
+
+    fn to_godot(&self) -> Self::ToVia<'_> {
+        self.deref().clone()
     }
 }
 
