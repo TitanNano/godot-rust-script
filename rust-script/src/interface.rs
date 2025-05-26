@@ -20,6 +20,10 @@ pub use crate::runtime::Context;
 pub use export::GodotScriptExport;
 pub use signals::{ScriptSignal, Signal};
 
+/// The primary trait of this library. This trait must be implemented by a struct to create a new rust script.
+///
+/// While it is possible, it's not intended that this trait is implemented by hand. Use the [derive macro](derive@crate::GodotScript) to
+/// implement this trait.
 pub trait GodotScript: Debug + GodotScriptImpl<ImplBase = Self::Base> {
     type Base: Inherits<Object>;
 
@@ -171,6 +175,21 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
     }
 }
 
+/// Defines the root module for rust scripts. All scripts must be in submodules of the root module.
+///
+/// There must be a script root module in your project for Godot Rust Script to work. Using multiple root modules is currently not supported.
+///
+/// # Example
+/// ```ignore
+/// # use godot_rust_script::define_script_root;
+/// // Example script root: src/scripts/mod.rs
+///
+/// // define your script modules that contain `RustScript` structs.
+/// mod player;
+/// mod mob;
+///
+/// define_script_root!();
+/// ```
 #[macro_export]
 macro_rules! define_script_root {
     () => {
@@ -202,6 +221,7 @@ macro_rules! define_script_root {
     };
 }
 
+/// DEPRECATED: This macro has been renamed to [define_script_root].
 #[deprecated = "Has been renamed to define_script_root!()"]
 #[macro_export]
 macro_rules! setup_library {
@@ -212,6 +232,43 @@ macro_rules! setup_library {
 
 pub trait GodotScriptEnum: GodotConvert + FromGodot + ToGodot {}
 
+/// Initialize the rust script runtime. This should be part of your `ExtensionLibrary::on_level_init` function.
+///
+/// # Example
+/// ```
+/// # use godot::init::{gdextension, InitLevel, ExtensionLibrary};
+/// #
+/// # mod scripts {
+/// #     pub const __GODOT_RUST_SCRIPT_SRC_ROOT: &str = "/dummy/root";
+/// #
+/// #     pub fn __godot_rust_script_init() -> Vec<godot_rust_script::private_export::RustScriptMetaData> {
+/// #         unimplemented!()
+/// #     }
+/// # }
+/// #
+/// struct Lib;
+///
+/// #[gdextension]
+/// unsafe impl ExtensionLibrary for Lib {
+///     fn on_level_init(level: InitLevel) {
+///         match level {
+///             InitLevel::Core => (),
+///             InitLevel::Servers => (),
+///             InitLevel::Scene => godot_rust_script::init!(scripts),
+///             InitLevel::Editor => (),
+///         }
+///     }
+///  
+///  #  fn on_level_deinit(level: InitLevel) {
+///  #      match level {
+///  #          InitLevel::Editor => (),
+///  #          InitLevel::Scene => godot_rust_script::deinit!(),
+///  #          InitLevel::Servers => (),
+///  #          InitLevel::Core => (),
+///  #      }
+///  #  }
+/// }
+/// ````
 #[macro_export]
 macro_rules! init {
     ($scripts_module:tt) => {
@@ -222,6 +279,43 @@ macro_rules! init {
     };
 }
 
+/// Deinitialize the rust script runtime. This should be part of your `ExtensionLibrary::on_level_deinit` function.
+///
+/// # Example
+/// ```
+/// # use godot::init::{gdextension, InitLevel, ExtensionLibrary};
+/// #
+/// # mod scripts {
+/// #     pub const __GODOT_RUST_SCRIPT_SRC_ROOT: &str = "/dummy/root";
+/// #
+/// #     pub fn __godot_rust_script_init() -> Vec<godot_rust_script::private_export::RustScriptMetaData> {
+/// #         unimplemented!()
+/// #     }
+/// # }
+/// #
+/// struct Lib;
+///
+/// #[gdextension]
+/// unsafe impl ExtensionLibrary for Lib {
+/// #   fn on_level_init(level: InitLevel) {
+/// #       match level {
+/// #           InitLevel::Core => (),
+/// #           InitLevel::Servers => (),
+/// #           InitLevel::Scene => godot_rust_script::init!(scripts),
+/// #           InitLevel::Editor => (),
+/// #       }
+/// #   }
+/// #
+///     fn on_level_deinit(level: InitLevel) {
+///         match level {
+///             InitLevel::Editor => (),
+///             InitLevel::Scene => godot_rust_script::deinit!(),
+///             InitLevel::Servers => (),
+///             InitLevel::Core => (),
+///         }
+///     }
+/// }
+/// ````
 #[macro_export]
 macro_rules! deinit {
     () => {
