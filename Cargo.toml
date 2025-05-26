@@ -24,3 +24,6 @@ thiserror = "1"
 
 godot-rust-script-derive = { path = "derive" }
 tests-scripts-lib = { path = "tests-scripts-lib" }
+
+[workspace.lints.rust]
+missing_docs = "warn"

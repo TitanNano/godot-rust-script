@@ -4,6 +4,8 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+#![doc = include_str!("../../README.md")]
+
 mod apply;
 
 mod editor_ui_hacks;
@@ -11,7 +13,8 @@ mod interface;
 mod runtime;
 mod static_script_registry;
 
-pub use godot_rust_script_derive::{godot_script_impl, GodotScript, GodotScriptEnum};
+pub use godot_rust_script_derive::GodotScript;
+pub use godot_rust_script_derive::{godot_script_impl, GodotScriptEnum};
 pub use interface::*;
 pub use runtime::RustScriptExtensionLayer;
 
