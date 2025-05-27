@@ -20,6 +20,8 @@ use godot::obj::{EngineEnum, Gd};
 use godot::prelude::GodotClass;
 use godot::sys::GodotFfi;
 
+use super::{GodotScript, RsRef};
+
 pub trait GodotScriptExport: GodotConvert + FromGodot + ToGodot {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String;
 
@@ -43,6 +45,30 @@ impl<T: GodotClass> GodotScriptExport for Gd<T> {
         if T::inherits::<Node>() {
             PropertyHint::NODE_TYPE
         } else if T::inherits::<Resource>() {
+            PropertyHint::RESOURCE_TYPE
+        } else {
+            PropertyHint::NONE
+        }
+    }
+}
+
+impl<T: GodotScript> GodotScriptExport for RsRef<T> {
+    fn hint_string(_custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
+        if let Some(custom) = custom_string {
+            return custom;
+        }
+
+        T::CLASS_NAME.to_string()
+    }
+
+    fn hint(custom: Option<PropertyHint>) -> PropertyHint {
+        if let Some(custom) = custom {
+            return custom;
+        }
+
+        if T::Base::inherits::<Node>() {
+            PropertyHint::NODE_TYPE
+        } else if T::Base::inherits::<Resource>() {
             PropertyHint::RESOURCE_TYPE
         } else {
             PropertyHint::NONE
