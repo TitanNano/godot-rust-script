@@ -10,9 +10,9 @@ version = "0.1.0"
 edition = "2021"
 
 [workspace.dependencies]
-godot = { version = "0.2", features = ["experimental-threads"] }
-godot-cell = "0.2"
-godot-bindings = "0.2"
+godot = { version = "0.3", features = ["experimental-threads"] }
+godot-cell = "0.3"
+godot-bindings = "0.3"
 itertools = "0.10"
 rand = "0.8"
 darling = { version = "0.20" }

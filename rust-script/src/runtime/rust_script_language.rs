@@ -357,7 +357,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     }
 
     #[expect(unused_variables)]
-    unsafe fn debug_get_stack_level_instance(&mut self, level: i32) -> *mut c_void {
+    unsafe fn debug_get_stack_level_instance_rawptr(&mut self, level: i32) -> *mut c_void {
         unimplemented!("debugging is not implemented!");
     }
 
@@ -391,7 +391,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     fn profiling_set_save_native_calls(&mut self, enable: bool) {}
 
     #[expect(unused_variables)]
-    unsafe fn profiling_get_accumulated_data(
+    unsafe fn profiling_get_accumulated_data_rawptr(
         &mut self,
         info_array: *mut ScriptLanguageExtensionProfilingInfo,
         info_max: i32,
@@ -400,7 +400,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     }
 
     #[expect(unused_variables)]
-    unsafe fn profiling_get_frame_data(
+    unsafe fn profiling_get_frame_data_rawptr(
         &mut self,
         info_array: *mut ScriptLanguageExtensionProfilingInfo,
         info_max: i32,

@@ -26,7 +26,7 @@ godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 macro_rules! register_script_class {
     ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr) => {
         $crate::private_export::plugin_add! {
-        SCRIPT_REGISTRY in $crate::private_export;
+            $crate::private_export::SCRIPT_REGISTRY;
             $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
                 class_name: stringify!($class_name),
                 class_name_cstr: ::std::ffi::CStr::from_bytes_with_nul(concat!(stringify!($class_name), "\0").as_bytes()).unwrap(),
@@ -49,7 +49,7 @@ macro_rules! register_script_class {
 macro_rules! register_script_class {
     ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr) => {
         $crate::private_export::plugin_add! {
-        SCRIPT_REGISTRY in $crate::private_export;
+            $crate::private_export::SCRIPT_REGISTRY ;
             $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
                 class_name: stringify!($class_name),
                 base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_name().to_cow_str(),
@@ -70,7 +70,7 @@ macro_rules! register_script_class {
 macro_rules! register_script_methods {
     ($class_name:ty, $methods:expr) => {
         $crate::private_export::plugin_add! {
-            SCRIPT_REGISTRY in $crate::private_export;
+            $crate::private_export::SCRIPT_REGISTRY ;
             $crate::private_export::RegistryItem::Methods($crate::private_export::RustScriptEntryMethods {
                 class_name: stringify!($class_name),
                 methods: || {
@@ -349,7 +349,7 @@ pub struct RustScriptMetaData {
 }
 
 impl RustScriptMetaData {
-    #[expect(clippy::too_many_arguments)]
+    #[cfg_attr(before_api = "4.4", expect(clippy::too_many_arguments))]
     pub fn new(
         class_name: &'static str,
         #[cfg(before_api = "4.4")] class_name_cstr: &'static std::ffi::CStr,
