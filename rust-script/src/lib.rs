@@ -18,9 +18,9 @@ pub use runtime::RustScriptExtensionLayer;
 #[doc(hidden)]
 pub mod private_export {
     pub use crate::static_script_registry::{
-        RustScriptMetaData, __godot_rust_plugin_SCRIPT_REGISTRY, assemble_metadata,
-        create_default_data_struct, RegistryItem, RustScriptEntry, RustScriptEntryMethods,
-        RustScriptMethodDesc, RustScriptPropDesc, RustScriptSignalDesc,
+        assemble_metadata, create_default_data_struct, RegistryItem, RustScriptEntry,
+        RustScriptEntryMethods, RustScriptMetaData, RustScriptMethodDesc, RustScriptPropDesc,
+        RustScriptSignalDesc, SCRIPT_REGISTRY,
     };
     pub use const_str::{concat, replace, strip_prefix, unwrap};
     pub use godot::sys::{plugin_add, plugin_registry};
