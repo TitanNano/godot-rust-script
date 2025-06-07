@@ -13,7 +13,7 @@ use godot::classes::{
 use godot::global::{godot_error, godot_print, godot_warn, PropertyUsageFlags};
 use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::script::create_script_instance;
-use godot::obj::{EngineBitfield, EngineEnum, InstanceId, WithBaseField};
+use godot::obj::{EngineBitfield, InstanceId, WithBaseField};
 use godot::prelude::{
     godot_api, Array, Base, Callable, Dictionary, GString, Gd, GodotClass, StringName, Variant,
     VariantArray,
@@ -183,7 +183,7 @@ impl IScriptExtension for RustScript {
         false
     }
 
-    unsafe fn instance_create(&self, mut for_object: Gd<Object>) -> *mut c_void {
+    unsafe fn instance_create_rawptr(&self, mut for_object: Gd<Object>) -> *mut c_void {
         self.owners.borrow_mut().insert(for_object.instance_id());
 
         let data = self.create_remote_instance(for_object.clone());
@@ -203,7 +203,7 @@ impl IScriptExtension for RustScript {
         create_script_instance(instance, for_object)
     }
 
-    unsafe fn placeholder_instance_create(&self, for_object: Gd<Object>) -> *mut c_void {
+    unsafe fn placeholder_instance_create_rawptr(&self, for_object: Gd<Object>) -> *mut c_void {
         self.owners.borrow_mut().insert(for_object.instance_id());
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());

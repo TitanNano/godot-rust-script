@@ -204,7 +204,7 @@ macro_rules! define_script_root {
             use $crate::godot::obj::EngineEnum;
             use $crate::private_export::*;
 
-            let lock = $crate::private_export::__godot_rust_plugin_SCRIPT_REGISTRY
+            let lock = $crate::private_export::SCRIPT_REGISTRY
                 .lock()
                 .expect("unable to aquire mutex lock");
 
