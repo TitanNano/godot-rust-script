@@ -21,6 +21,7 @@ use crate::runtime::GodotScriptObject;
 
 godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 
+#[doc(hidden)]
 #[macro_export]
 #[cfg(before_api = "4.4")]
 macro_rules! register_script_class {
@@ -44,6 +45,7 @@ macro_rules! register_script_class {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 #[cfg(since_api = "4.4")]
 macro_rules! register_script_class {
@@ -66,6 +68,7 @@ macro_rules! register_script_class {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! register_script_methods {
     ($class_name:ty, $methods:expr) => {

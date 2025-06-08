@@ -46,7 +46,7 @@ For this, a manual implementation of the `godot::init::ExtensionLibrary` trait i
 be achieved via two macro calls. The `init!(...)` macro requires the name / path to a module in your library, which represents the root module
 of all available scripts.
 
-```rs
+```rust
 struct Lib;
 
 #[gdextension]
@@ -75,7 +75,7 @@ unsafe impl ExtensionLibrary for Lib {
 
 Rust scripts require a root module. All rust modules under this module will be considered as potential scripts.
 
-```rs
+```rust
 mod example_script;
 
 godot_rust_script::define_script_root!();
@@ -92,7 +92,7 @@ Scripts are then composed of a `struct` definition and an `impl` block. Public f
 other scripting languages and the engine, so they must use Godot compatible types. The same applies to struct fields. 
 Struct fields can additionally be exported via the `#[export]` attribute, so they show up in the editor inspector.
 
-```rs
+```rust
 use godot_rust_script::{
 	godot::prelude::{godot_print, Gd, GodotString, Node3D, Object},
 	godot_script_impl, GodotScript,
