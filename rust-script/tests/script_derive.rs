@@ -7,7 +7,9 @@
 use godot::builtin::{Array, GString};
 use godot::classes::{Node, Node3D};
 use godot::obj::{Gd, NewAlloc};
-use godot_rust_script::{godot_script_impl, Context, GodotScript, GodotScriptEnum, Signal};
+use godot_rust_script::{
+    godot_script_impl, CastToScript, Context, GodotScript, GodotScriptEnum, RsRef, ScriptSignal,
+};
 
 #[derive(Debug, Default, GodotScriptEnum)]
 #[script_enum(export)]
@@ -30,10 +32,16 @@ struct TestScript {
     pub enum_prop: u8,
 
     #[signal]
-    pub changed: Signal<()>,
+    pub changed: ScriptSignal<()>,
+
+    #[signal("Expected", "Actual")]
+    pub ready: ScriptSignal<(u32, u32)>,
+
+    #[signal("Base_Node")]
+    pub ready_base: ScriptSignal<Gd<Node>>,
 
     #[signal]
-    pub ready: Signal<(u32, u32)>,
+    pub ready_self: ScriptSignal<RsRef<TestScript>>,
 
     pub node_prop: Option<Gd<Node3D>>,
 
@@ -67,6 +75,10 @@ impl TestScript {
         ctx.reentrant_scope(self, || {
             base.emit_signal("hit", &[]);
         });
+
+        self.ready.emit((1, 2));
+        self.ready_base.emit(self.base.clone());
+        self.ready_self.emit(self.base.to_script());
 
         ctx.reentrant_scope(self, |mut base: Gd<Node>| {
             base.set_owner(&Node::new_alloc());
