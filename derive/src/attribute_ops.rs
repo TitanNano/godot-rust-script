@@ -33,6 +33,9 @@ pub struct FieldExportOps {
     custom_type: Option<WithOriginal<LitStr, Meta>>,
 }
 
+#[derive(FromMeta, Debug)]
+pub struct FieldSignalOps(pub WithOriginal<Vec<syn::LitStr>, Meta>);
+
 impl FieldExportOps {
     pub fn hint(&self, ty: &Type) -> Result<(TokenStream, TokenStream), TokenStream> {
         let godot_types = godot_types();
