@@ -95,7 +95,9 @@ where
 
 impl<T: ArrayElement + GodotScriptExport + GodotType> GodotScriptExport for Array<T> {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
-        let element_type = <<T as GodotType>::Ffi as GodotFfi>::VARIANT_TYPE.ord();
+        let element_type = <<T as GodotType>::Ffi as GodotFfi>::VARIANT_TYPE
+            .variant_as_nil()
+            .ord();
         let element_hint = <T as GodotScriptExport>::hint(custom_hint).ord();
         let element_hint_string = <T as GodotScriptExport>::hint_string(custom_hint, custom_string);
 

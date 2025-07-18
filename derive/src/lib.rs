@@ -184,7 +184,7 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
                 use #godot_types::sys::GodotFfi;
                 use #godot_types::meta::GodotType;
 
-                <<#path as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::VARIANT_TYPE
+                <<#path as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::VARIANT_TYPE.variant_as_nil()
             }
         }),
         T::Verbatim(_) => Err(syn::Error::new(
@@ -206,7 +206,7 @@ fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
                     use #godot_types::sys::GodotFfi;
                     use #godot_types::meta::GodotType;
 
-                    <<#tuple as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::VARIANT_TYPE
+                    <<#tuple as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::VARIANT_TYPE.variant_as_nil()
                 }
             })
         }
