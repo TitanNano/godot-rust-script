@@ -1,0 +1,38 @@
+
+name: "Nightly Check"
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: "ubuntu-22.04"
+    env:
+      RUSTFLAGS: "-D warnings"
+    strategy:
+      matrix:
+        api_version: ["4-1", "4-2", "4-3", "4-4"]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - name: Setup Cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+    - name: Update Dependencies
+      run: |
+        cargo update
+    - name: Build Debug
+      run: |
+        set -o pipefail
+        cargo build --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json
+    - name: Build Release
+      run: |
+        set -o pipefail
+        cargo build --release --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json
