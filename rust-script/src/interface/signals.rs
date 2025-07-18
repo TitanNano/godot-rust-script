@@ -123,7 +123,7 @@ macro_rules! signal_argument_desc {
     ($name:literal, $type:ty) => {
         RustScriptPropDesc {
             name: $name,
-            ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::VARIANT_TYPE,
+            ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::VARIANT_TYPE.variant_as_nil(),
             class_name: <<$type as GodotConvert>::Via as GodotType>::class_name(),
             exported: false,
             hint: PropertyHint::NONE,
