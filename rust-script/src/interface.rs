@@ -18,6 +18,7 @@ use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 pub use crate::runtime::Context;
 
 pub use export::GodotScriptExport;
+#[expect(deprecated)]
 pub use signals::{ScriptSignal, Signal};
 
 pub trait GodotScript: Debug + GodotScriptImpl<ImplBase = Self::Base> {

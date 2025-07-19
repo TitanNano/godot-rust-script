@@ -10,14 +10,14 @@ mod impl_attribute;
 mod type_paths;
 
 use attribute_ops::{FieldOpts, GodotScriptOpts};
-use darling::{util::SpannedValue, FromAttributes, FromDeriveInput};
+use darling::{util::SpannedValue, FromAttributes, FromDeriveInput, FromMeta};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
 use type_paths::{godot_types, property_hints, string_name_ty, variant_ty};
 
-use crate::attribute_ops::{FieldExportOps, PropertyOpts};
+use crate::attribute_ops::{FieldExportOps, FieldSignalOps, PropertyOpts};
 
 #[proc_macro_derive(GodotScript, attributes(export, script, prop, signal))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -47,7 +47,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         export_field_state,
     ): (
         TokenStream,
-        TokenStream,
+        (TokenStream, TokenStream),
         TokenStream,
         TokenStream,
         TokenStream,
@@ -92,12 +92,12 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 (is_public && !is_signal).then(|| derive_property_state_export(field));
 
             let signal_metadata = match (is_public, is_signal) {
-                (false, false) | (true, false) => TokenStream::default(),
+                (false, false) | (true, false) => (TokenStream::default(), TokenStream::default()),
                 (true, true) => derive_signal_metadata(field),
                 (false, true) => {
                     let err = compile_error("Signals must be public!", signal_attr);
 
-                    quote! {#err,}
+                    (quote! {#err,}, TokenStream::default())
                 }
             };
 
@@ -133,6 +133,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             acc
         });
 
+    let (signal_metadata, signal_const_assert) = signal_metadata;
+
     let output = quote! {
         impl ::godot_rust_script::GodotScript for #script_type_ident {
             type Base = #base_class;
@@ -155,6 +157,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             #default_impl
         }
+
+        #signal_const_assert
 
         ::godot_rust_script::register_script_class!(
             #script_type_ident,
@@ -433,7 +437,7 @@ fn get_field_description(field: &FieldOpts) -> Option<TokenStream> {
         })
 }
 
-fn derive_signal_metadata(field: &SpannedValue<FieldOpts>) -> TokenStream {
+fn derive_signal_metadata(field: &SpannedValue<FieldOpts>) -> (TokenStream, TokenStream) {
     let signal_name = field
         .ident
         .as_ref()
@@ -441,14 +445,59 @@ fn derive_signal_metadata(field: &SpannedValue<FieldOpts>) -> TokenStream {
         .unwrap_or_default();
     let signal_description = get_field_description(field);
     let signal_type = &field.ty;
+    let signal_ops = match field
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("signal"))
+        .and_then(|attr| match &attr.meta {
+            syn::Meta::Path(_) => None,
+            syn::Meta::List(_) => Some(FieldSignalOps::from_meta(&attr.meta)),
+            syn::Meta::NameValue(_) => Some(Err(darling::Error::custom(
+                "Signal attribute does not support assigning a value!",
+            )
+            .with_span(&attr.meta))),
+        })
+        .transpose()
+    {
+        Ok(ops) => ops,
+        Err(err) => return (TokenStream::default(), err.write_errors()),
+    };
 
-    quote! {
+    let const_assert = signal_ops.as_ref().map(|ops| {
+        let count = ops.0.parsed.len();
+
+        quote_spanned! { ops.0.original.span() =>
+            const _: () = {
+                assert!(<#signal_type>::ARG_COUNT == #count as u8, "argument names do not match number of arguments.");
+            };
+        }
+    });
+
+    let argument_names = signal_ops
+        .map(|names| {
+            let span = names.0.original.span();
+            #[expect(unstable_name_collisions)]
+            let names: TokenStream = names
+                .0
+                .parsed
+                .iter()
+                .map(|name| name.to_token_stream())
+                .intersperse(quote!(,).into_token_stream())
+                .collect();
+
+            quote_spanned! { span =>  Some(&[#names]) }
+        })
+        .unwrap_or_else(|| quote!(None));
+
+    let metadata = quote! {
         ::godot_rust_script::private_export::RustScriptSignalDesc {
             name: #signal_name,
-            arguments: <#signal_type as ::godot_rust_script::ScriptSignal>::argument_desc(),
+            arguments: <#signal_type>::argument_desc(#argument_names),
             description: concat!(#signal_description),
         },
-    }
+    };
+
+    (metadata, const_assert.unwrap_or_default())
 }
 
 #[proc_macro_attribute]
