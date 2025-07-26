@@ -60,13 +60,13 @@ pub fn godot_script_impl(
                     let arg_rust_type = arg.ty.as_ref();
                     let arg_type = rust_to_variant_type(arg.ty.as_ref()).unwrap();
 
-                    if is_context_type(arg.ty.as_ref()) { 
+                    if is_context_type(arg.ty.as_ref()) {
                         (
                             quote!(),
 
                             quote_spanned!(arg.span() => ctx,)
                         )
-                    } else { 
+                    } else {
                         (
                             quote_spanned! {
                                 arg.span() =>

@@ -15,14 +15,15 @@ use godot::builtin::{
 };
 use godot::classes::{Node, Resource};
 use godot::global::PropertyHint;
-use godot::meta::{ArrayElement, FromGodot, GodotConvert, GodotType, ToGodot};
+use godot::meta::{ArrayElement, GodotConvert, GodotType};
 use godot::obj::{EngineEnum, Gd};
 use godot::prelude::GodotClass;
+use godot::register::property::BuiltinExport;
 use godot::sys::GodotFfi;
 
-use super::{GodotScript, RsRef};
+use super::{GodotScript, OnEditor, RsRef};
 
-pub trait GodotScriptExport: GodotConvert + FromGodot + ToGodot {
+pub trait GodotScriptExport {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String;
 
     fn hint(custom: Option<PropertyHint>) -> PropertyHint;
@@ -78,11 +79,7 @@ impl<T: GodotScript> GodotScriptExport for RsRef<T> {
 
 impl<T: GodotScriptExport> GodotScriptExport for Option<T>
 where
-    for<'v> T: 'v,
-    for<'v> <<T as ToGodot>::ToVia<'v> as GodotType>::Ffi: godot::sys::GodotNullableFfi,
-    for<'f> <<T as GodotConvert>::Via as GodotType>::ToFfi<'f>: godot::sys::GodotNullableFfi,
-    <<T as GodotConvert>::Via as GodotType>::Ffi: godot::sys::GodotNullableFfi,
-    for<'v, 'f> <<T as ToGodot>::ToVia<'v> as GodotType>::ToFfi<'f>: godot::sys::GodotNullableFfi,
+    Self: GodotConvert + godot::prelude::Var,
 {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
         T::hint_string(custom_hint, custom_string)
@@ -112,6 +109,21 @@ impl<T: ArrayElement + GodotScriptExport + GodotType> GodotScriptExport for Arra
         PropertyHint::ARRAY_TYPE
     }
 }
+
+impl<T: GodotScriptExport> GodotScriptExport for OnEditor<T>
+where
+    Self: GodotConvert + godot::prelude::Var,
+{
+    fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
+        T::hint_string(custom_hint, custom_string)
+    }
+
+    fn hint(custom: Option<PropertyHint>) -> PropertyHint {
+        T::hint(custom)
+    }
+}
+
+impl<T: GodotScript> BuiltinExport for RsRef<T> {}
 
 macro_rules! default_export {
     ($ty:ty) => {
@@ -193,7 +205,6 @@ default_export!(i8);
 default_export!(u32);
 default_export!(u16);
 default_export!(u8);
-default_export!(u64);
 
 default_export!(Callable);
 default_export!(godot::builtin::Signal);

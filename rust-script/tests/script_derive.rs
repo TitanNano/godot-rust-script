@@ -8,7 +8,8 @@ use godot::builtin::{Array, GString};
 use godot::classes::{Node, Node3D};
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{
-    godot_script_impl, CastToScript, Context, GodotScript, GodotScriptEnum, RsRef, ScriptSignal,
+    godot_script_impl, CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef,
+    ScriptSignal,
 };
 
 #[derive(Debug, Default, GodotScriptEnum)]
@@ -48,6 +49,9 @@ struct TestScript {
     #[export(ty = "Decal")]
     pub node_prop_2: Option<Gd<Node3D>>,
 
+    #[export(ty = "Decal")]
+    pub node_prop_3: OnEditor<Gd<Node3D>>,
+
     #[export]
     pub node_array: Array<Gd<Node3D>>,
 
@@ -57,6 +61,11 @@ struct TestScript {
     #[export]
     pub custom_enum: ScriptEnum,
 
+    #[export]
+    pub script_ref_opt: Option<RsRef<TestScript>>,
+
+    #[export]
+    pub script_ref: OnEditor<RsRef<TestScript>>,
     base: Gd<<Self as GodotScript>::Base>,
 }
 

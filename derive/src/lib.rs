@@ -279,7 +279,7 @@ fn derive_get_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
 
     quote_spanned! {field.ty.span()=>
         #[allow(clippy::needless_borrow)]
-        #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&#accessor)),
+        #field_name => Some(#godot_types::prelude::ToGodot::to_variant(&::godot_rust_script::GetScriptProperty::get_property(&#accessor))),
     }
 }
 
@@ -313,7 +313,9 @@ fn derive_set_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
 
     let assignment = match opts.set {
         Some(setter) => quote_spanned!(setter.span()=> #setter(self, local_value)),
-        None => quote_spanned!(field.ty.span() => self.#field_ident = local_value),
+        None => {
+            quote_spanned!(field.ty.span() => ::godot_rust_script::SetScriptProperty::set_property(&mut self.#field_ident, local_value))
+        }
     };
 
     quote! {
