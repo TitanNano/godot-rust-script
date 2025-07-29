@@ -5,6 +5,7 @@
  */
 
 mod export;
+mod on_editor;
 mod signals;
 
 use std::marker::PhantomData;
@@ -18,6 +19,7 @@ use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 pub use crate::runtime::Context;
 
 pub use export::GodotScriptExport;
+pub use on_editor::OnEditor;
 #[expect(deprecated)]
 pub use signals::{ScriptSignal, Signal};
 
@@ -135,6 +137,20 @@ impl<T: GodotScript> ToGodot for RsRef<T> {
     }
 }
 
+impl<'v, T: GodotScript> ::godot::prelude::Var for RsRef<T>
+where
+    Self: GodotConvert<Via = <Self as ToGodot>::ToVia<'v>>,
+    Self: 'v,
+{
+    fn get_property(&self) -> Self::Via {
+        <Self as ToGodot>::to_godot(self)
+    }
+
+    fn set_property(&mut self, value: Self::Via) {
+        <Self as FromGodot>::from_godot(value);
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum GodotScriptCastError {
     #[error("Object has no script attached!")]
@@ -193,6 +209,59 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
                 err
             );
         })
+    }
+}
+
+/// Script property access indirection
+///
+/// gdext uses this kind of indirection to allow conversion of the actual property value into a godot compatible type when accessing the
+/// property from the engine. This Trait separates the `::godot::prelude::Var` trait into it's get and set components for more granular
+/// requirements on the property types.
+pub trait GetScriptProperty: GodotConvert {
+    fn get_property(&self) -> Self::Via;
+}
+
+/// Script property write indirection
+///
+/// gdext uses this kind of indirection to allow conversion of the actual property value from a godot compatible type when setting the
+/// property from the engine. This Trait separates the `::godot::prelude::Var` trait into it's get and set components for more granular
+/// requirements on the property types.
+pub trait SetScriptProperty: GodotConvert {
+    fn set_property(&mut self, value: Self::Via);
+}
+
+/// Unified property init strategy.
+///
+/// Most of the time we can initialize a script property with the `Default` trait. To support cases where `Default` is not implemented we
+/// can manually implement this trait.
+pub trait InitScriptProperty {
+    fn init_property() -> Self;
+}
+
+impl<T> GetScriptProperty for T
+where
+    T: godot::prelude::Var,
+{
+    fn get_property(&self) -> Self::Via {
+        T::get_property(self)
+    }
+}
+
+impl<T> SetScriptProperty for T
+where
+    T: godot::prelude::Var,
+{
+    fn set_property(&mut self, value: Self::Via) {
+        T::set_property(self, value);
+    }
+}
+
+impl<T> InitScriptProperty for T
+where
+    T: Default,
+{
+    fn init_property() -> Self {
+        Default::default()
     }
 }
 

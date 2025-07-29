@@ -17,6 +17,8 @@ use godot::obj::{Gd, GodotClass};
 use crate::static_script_registry::RustScriptPropDesc;
 use crate::{GodotScript, RsRef};
 
+use super::GetScriptProperty;
+
 pub trait SignalArguments {
     const COUNT: u8;
 
@@ -218,5 +220,11 @@ impl<T: SignalArguments> ToGodot for ScriptSignal<T> {
 
     fn to_godot(&self) -> Self::Via {
         godot::builtin::Signal::from_object_signal(&self.host, self.name)
+    }
+}
+
+impl<T: SignalArguments> GetScriptProperty for ScriptSignal<T> {
+    fn get_property(&self) -> Self::Via {
+        self.to_godot()
     }
 }

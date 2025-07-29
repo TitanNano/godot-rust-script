@@ -136,6 +136,16 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
             }
         }
 
+        impl #godot_types::prelude::Var for #enum_ident {
+            fn get_property(&self) -> Self::Via {
+                self.into()
+            }
+
+            fn set_property(&mut self, value: Self::Via) {
+                *self = #godot_types::meta::FromGodot::try_from_godot(value).unwrap();
+            }
+        }
+
         #derive_export
     };
 
