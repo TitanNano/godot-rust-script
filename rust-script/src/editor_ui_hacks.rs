@@ -6,7 +6,8 @@
 
 use godot::classes::{EditorInterface, Engine};
 use godot::global::godot_warn;
-use godot::meta::ToGodot;
+use godot::meta::{ByValue, ToGodot};
+use godot::obj::Singleton as _;
 use godot::prelude::GodotConvert;
 
 #[derive(Clone, Copy)]
@@ -29,9 +30,9 @@ impl GodotConvert for EditorToasterSeverity {
 }
 
 impl ToGodot for EditorToasterSeverity {
-    type ToVia<'v> = Self::Via;
+    type Pass = ByValue;
 
-    fn to_godot(&self) -> Self::ToVia<'static> {
+    fn to_godot(&self) -> Self::Via {
         (*self).into()
     }
 }

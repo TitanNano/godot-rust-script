@@ -11,7 +11,7 @@ use godot::builtin::{
 };
 use godot::classes::Object;
 use godot::global::{Error, PropertyHint};
-use godot::meta::{GodotConvert, GodotType, ToGodot};
+use godot::meta::{ByValue, GodotConvert, GodotType, ToGodot};
 use godot::obj::{Gd, GodotClass};
 
 use crate::static_script_registry::RustScriptPropDesc;
@@ -112,7 +112,7 @@ macro_rules! signal_argument_desc {
         RustScriptPropDesc {
             name: $name,
             ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::VARIANT_TYPE.variant_as_nil(),
-            class_name: <<$type as GodotConvert>::Via as GodotType>::class_name(),
+            class_name: <<$type as GodotConvert>::Via as GodotType>::class_id(),
             exported: false,
             hint: PropertyHint::NONE,
             hint_string: String::new(),
@@ -213,10 +213,7 @@ impl<T: SignalArguments> GodotConvert for ScriptSignal<T> {
 }
 
 impl<T: SignalArguments> ToGodot for ScriptSignal<T> {
-    type ToVia<'v>
-        = Self::Via
-    where
-        Self: 'v;
+    type Pass = ByValue;
 
     fn to_godot(&self) -> Self::Via {
         godot::builtin::Signal::from_object_signal(&self.host, self.name)

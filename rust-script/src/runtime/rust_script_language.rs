@@ -11,7 +11,7 @@ use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
 use godot::classes::script_language::ScriptNameCasing;
 use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
 use godot::global::{self, godot_error};
-use godot::obj::Base;
+use godot::obj::{Base, Singleton as _};
 use godot::prelude::{
     godot_api, Array, Dictionary, GString, Gd, GodotClass, Object, PackedStringArray, StringName,
     Variant, VariantArray,
@@ -57,7 +57,7 @@ impl RustScriptLanguage {
 
     pub fn singleton() -> Option<Gd<Self>> {
         Engine::singleton()
-            .get_singleton(&RustScriptLanguage::class_name().to_string_name())
+            .get_singleton(&RustScriptLanguage::class_id().to_string_name())
             .map(|gd| gd.cast())
     }
 

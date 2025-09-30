@@ -21,7 +21,7 @@ use godot::classes::{
     ScriptLanguage,
 };
 use godot::global::godot_warn;
-use godot::obj::{GodotClass, Inherits};
+use godot::obj::{GodotClass, Inherits, Singleton as _};
 use godot::prelude::{godot_print, Gd};
 use godot::register::GodotClass;
 use once_cell::sync::Lazy;
@@ -81,17 +81,17 @@ impl RustScriptExtensionLayer {
         load_rust_scripts(lib_init_fn);
 
         engine.register_script_language(&lang);
-        engine.register_singleton(&RustScriptLanguage::class_name().to_string_name(), &lang);
+        engine.register_singleton(&RustScriptLanguage::class_id().to_string_name(), &lang);
 
         ResourceSaver::singleton().add_resource_format_saver(&res_saver);
         engine.register_singleton(
-            &RustScriptResourceSaver::class_name().to_string_name(),
+            &RustScriptResourceSaver::class_id().to_string_name(),
             &RefCountedSingleton::new(&res_saver),
         );
 
         ResourceLoader::singleton().add_resource_format_loader(&res_loader);
         engine.register_singleton(
-            &RustScriptResourceLoader::class_name().to_string_name(),
+            &RustScriptResourceLoader::class_id().to_string_name(),
             &RefCountedSingleton::new(&res_loader),
         );
 
@@ -103,16 +103,16 @@ impl RustScriptExtensionLayer {
         let mut engine = Engine::singleton();
 
         if let Some(lang) = engine
-            .get_singleton(&RustScriptLanguage::class_name().to_string_name())
+            .get_singleton(&RustScriptLanguage::class_id().to_string_name())
             .map(Gd::cast::<ScriptLanguage>)
         {
             engine.unregister_script_language(&lang);
-            engine.unregister_singleton(&RustScriptLanguage::class_name().to_string_name());
+            engine.unregister_singleton(&RustScriptLanguage::class_id().to_string_name());
             lang.free();
         }
 
         if let Some(res_loader_singleton) = engine
-            .get_singleton(&RustScriptResourceLoader::class_name().to_string_name())
+            .get_singleton(&RustScriptResourceLoader::class_id().to_string_name())
             .map(Gd::cast::<RefCountedSingleton>)
         {
             let res_loader = res_loader_singleton.bind().get();
@@ -126,12 +126,12 @@ impl RustScriptExtensionLayer {
 
             ResourceLoader::singleton()
                 .remove_resource_format_loader(&res_loader.cast::<ResourceFormatLoader>());
-            engine.unregister_singleton(&RustScriptResourceLoader::class_name().to_string_name());
+            engine.unregister_singleton(&RustScriptResourceLoader::class_id().to_string_name());
             res_loader_singleton.free();
         }
 
         if let Some(res_saver_singleton) = engine
-            .get_singleton(&RustScriptResourceSaver::class_name().to_string_name())
+            .get_singleton(&RustScriptResourceSaver::class_id().to_string_name())
             .map(Gd::cast::<RefCountedSingleton>)
         {
             let res_saver = res_saver_singleton.bind().get();
@@ -145,7 +145,7 @@ impl RustScriptExtensionLayer {
 
             ResourceSaver::singleton()
                 .remove_resource_format_saver(&res_saver.clone().cast::<ResourceFormatSaver>());
-            engine.unregister_singleton(&RustScriptResourceSaver::class_name().to_string_name());
+            engine.unregister_singleton(&RustScriptResourceSaver::class_id().to_string_name());
             res_saver_singleton.free();
         }
 

@@ -6,7 +6,7 @@
 
 use godot::classes::{ClassDb, IResourceFormatLoader, IScriptLanguageExtension, Script};
 use godot::global::godot_print;
-use godot::obj::Base;
+use godot::obj::{Base, Singleton as _};
 use godot::prelude::{
     godot_api, GString, Gd, GodotClass, PackedStringArray, StringName, ToGodot, Variant,
 };
@@ -45,7 +45,8 @@ impl IResourceFormatLoader for RustScriptResourceLoader {
     }
 
     fn handles_type(&self, type_: StringName) -> bool {
-        type_ == StringName::from("Script") || type_ == self.script_lang().bind().get_type().into()
+        type_ == StringName::from("Script")
+            || type_ == (&self.script_lang().bind().get_type()).into()
     }
 
     fn get_resource_type(&self, path: GString) -> GString {

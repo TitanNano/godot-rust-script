@@ -35,7 +35,7 @@ impl<T: GodotClass> GodotScriptExport for Gd<T> {
             return custom;
         }
 
-        T::class_name().to_string()
+        T::class_id().to_string()
     }
 
     fn hint(custom: Option<PropertyHint>) -> PropertyHint {

@@ -12,11 +12,13 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fmt::Debug};
 
-use godot::meta::{FromGodot, GodotConvert, ToGodot};
+use godot::meta::error::CallErrorType;
+use godot::meta::{ByValue, FromGodot, GodotConvert, ToGodot};
 use godot::obj::Inherits;
 use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 
 pub use crate::runtime::Context;
+use crate::runtime::RustScript;
 
 pub use export::GodotScriptExport;
 pub use on_editor::OnEditor;
@@ -35,7 +37,7 @@ pub trait GodotScript: Debug + GodotScriptImpl<ImplBase = Self::Base> {
         method: StringName,
         args: &[&Variant],
         context: Context<'_, Self>,
-    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
+    ) -> Result<Variant, CallErrorType>;
 
     fn to_string(&self) -> String;
     fn property_state(&self) -> HashMap<StringName, Variant>;
@@ -51,7 +53,7 @@ pub trait GodotScriptImpl {
         name: StringName,
         args: &[&Variant],
         context: Context<Self>,
-    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
+    ) -> Result<Variant, godot::meta::error::CallErrorType>;
 }
 
 #[derive(Debug)]
@@ -72,7 +74,8 @@ impl<T: GodotScript> RsRef<T> {
         let script = owner
             .upcast_ref::<Object>()
             .get_script()
-            .try_to::<Option<Gd<crate::runtime::RustScript>>>();
+            .map(|script| script.try_cast::<RustScript>())
+            .transpose();
 
         let Ok(script) = script else {
             return Some(GodotScriptCastError::NotRustScript);
@@ -127,20 +130,16 @@ where
 }
 
 impl<T: GodotScript> ToGodot for RsRef<T> {
-    type ToVia<'v>
-        = Gd<T::Base>
-    where
-        Self: 'v;
+    type Pass = ByValue;
 
-    fn to_godot(&self) -> Self::ToVia<'_> {
+    fn to_godot(&self) -> Self::Via {
         self.deref().clone()
     }
 }
 
-impl<'v, T: GodotScript> ::godot::prelude::Var for RsRef<T>
+impl<T: GodotScript> ::godot::prelude::Var for RsRef<T>
 where
-    Self: GodotConvert<Via = <Self as ToGodot>::ToVia<'v>>,
-    Self: 'v,
+    Self: GodotConvert,
 {
     fn get_property(&self) -> Self::Via {
         <Self as ToGodot>::to_godot(self)
@@ -193,7 +192,7 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
         self.try_to_script().unwrap_or_else(|err| {
             panic!(
                 "`{}` was assumed to have rust script `{}`, but this was not the case at runtime!\nError: {}",
-                B::class_name(),
+                B::class_id(),
                 T::CLASS_NAME,
                 err,
             );
@@ -204,7 +203,7 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
         self.try_into_script().unwrap_or_else(|err| {
             panic!(
                 "`{}` was assumed to have rust script `{}`, but this was not the case at runtime!\nError: {}",
-                B::class_name(),
+                B::class_id(),
                 T::CLASS_NAME,
                 err
             );

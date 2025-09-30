@@ -18,7 +18,7 @@ where
 {
     fn downgrade_gd<F: FnOnce(Gd<Self>) -> R, R>(&mut self, closure: F) -> R {
         let mut_base = self.base_mut();
-        let self_gd = mut_base.to_godot().cast();
+        let self_gd = mut_base.to_godot_owned().cast();
 
         closure(self_gd)
     }
