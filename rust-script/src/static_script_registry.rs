@@ -5,9 +5,9 @@
  */
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::Arc;
 
 use godot::builtin::{GString, StringName};
 use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
@@ -208,7 +208,6 @@ pub fn assemble_metadata<'a>(
 
             RustScriptMetaData::new(
                 class.class_name,
-                class.class_name_cstr,
                 class.base_type_name.as_ref().into(),
                 props,
                 methods,
@@ -266,7 +265,7 @@ impl From<&RustScriptMethodInfo> for MethodInfo {
         Self {
             id: value.id,
             method_name: value.method_name.into(),
-            class_name: ClassId::new_script(value.class_name, value.class_name_cstr),
+            class_name: ClassId::__alloc_next_unicode(value.class_name),
             return_type: (&value.return_type).into(),
             arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
             default_arguments: vec![],
@@ -317,10 +316,8 @@ pub struct RustScriptMetaData {
 }
 
 impl RustScriptMetaData {
-    #[expect(clippy::too_many_arguments)]
     pub fn new(
         class_name: &'static str,
-        class_name_cstr: &'static std::ffi::CStr,
         base_type_name: StringName,
         properties: Box<[RustScriptPropertyInfo]>,
         methods: Box<[RustScriptMethodInfo]>,
@@ -329,7 +326,7 @@ impl RustScriptMetaData {
         description: &'static str,
     ) -> Self {
         Self {
-            class_name: ClassId::new_script(class_name, class_name_cstr),
+            class_name: ClassId::__alloc_next_unicode(class_name),
 
             base_type_name,
             properties,
@@ -384,43 +381,13 @@ where
     }
 }
 
-static DYNAMIC_INDEX_BY_CLASS_NAME: LazyLock<RwLock<HashMap<&'static str, ClassId>>> =
-    LazyLock::new(RwLock::default);
-
-trait ClassNameExtension {
-    fn new_script(str: &'static str, cstr: &'static std::ffi::CStr) -> Self;
-}
-
-impl ClassNameExtension for ClassId {
-    fn new_script(str: &'static str, cstr: &'static std::ffi::CStr) -> Self {
-        // Check if class name exists.
-        if let Some(name) = DYNAMIC_INDEX_BY_CLASS_NAME.read().unwrap().get(str) {
-            return *name;
-        }
-
-        let mut map = DYNAMIC_INDEX_BY_CLASS_NAME.write().unwrap();
-
-        let class_name = *map.entry(str).or_insert_with(|| {
-            if str.is_ascii() {
-                ClassId::__alloc_next_ascii(cstr)
-            } else {
-                ClassId::__alloc_next_unicode(str)
-            }
-        });
-
-        class_name
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use godot::meta::ClassId;
 
-    use crate::static_script_registry::ClassNameExtension;
-
     #[test]
     fn new_class_name() {
-        let script_name = ClassId::new_script("TestScript", c"TestScript");
+        let script_name = ClassId::__alloc_next_unicode("TestScript");
 
         assert_eq!(script_name.to_cow_str(), "TestScript");
     }
@@ -428,7 +395,7 @@ mod tests {
     #[cfg(since_api = "4.4")]
     #[test]
     fn new_unicode_class_name() {
-        let script_name = ClassId::new_script("ÜbertragungsScript", c"ÜbertragungsScript");
+        let script_name = ClassId::__alloc_next_unicode("ÜbertragungsScript");
 
         assert_eq!(script_name.to_cow_str(), "ÜbertragungsScript");
     }

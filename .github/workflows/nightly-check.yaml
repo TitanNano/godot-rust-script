@@ -16,7 +16,7 @@ jobs:
       RUSTFLAGS: "-D warnings"
     strategy:
       matrix:
-        api_version: ["4-1", "4-2", "4-3", "4-4"]
+        api_version: ["4-2", "4-3", "4-4", "4-5"]
 
     steps:
     - name: Checkout
