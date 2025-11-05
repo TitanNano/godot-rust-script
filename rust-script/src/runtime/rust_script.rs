@@ -13,7 +13,7 @@ use godot::classes::{
 use godot::global::{godot_error, godot_print, godot_warn, PropertyUsageFlags};
 use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::script::create_script_instance;
-use godot::obj::{EngineBitfield, InstanceId, WithBaseField};
+use godot::obj::{EngineBitfield, InstanceId, Singleton as _, WithBaseField};
 use godot::prelude::{
     godot_api, Array, Base, Callable, Dictionary, GString, Gd, GodotClass, StringName, Variant,
     VariantArray,
@@ -52,10 +52,10 @@ pub(crate) struct RustScript {
 impl RustScript {
     pub fn new(class_name: String) -> Gd<Self> {
         let mut inst: Gd<Self> = ClassDb::singleton()
-            .instantiate(&<Self as GodotClass>::class_name().to_string_name())
+            .instantiate(&<Self as GodotClass>::class_id().to_string_name())
             .to();
 
-        inst.bind_mut().class_name = GString::from(class_name);
+        inst.bind_mut().class_name = GString::from(&class_name);
 
         inst
     }
@@ -115,7 +115,11 @@ impl RustScript {
             ),
         };
 
-        if let Err(err) = base.get_script().try_to::<Gd<RustScript>>() {
+        if let Err(err) = base
+            .get_script()
+            .map(|script| script.try_cast::<RustScript>())
+            .transpose()
+        {
             godot_warn!("expected new script to be previously assigned RustScript, but it wasn't!");
             godot_warn!("{}", err);
 
@@ -150,7 +154,7 @@ impl IScriptExtension for RustScript {
     }
 
     fn get_global_name(&self) -> StringName {
-        self.get_class_name().into()
+        (&self.get_class_name()).into()
     }
 
     fn get_source_code(&self) -> GString {
@@ -191,14 +195,12 @@ impl IScriptExtension for RustScript {
 
         let callbale_args = VariantArray::from(&[for_object.to_variant()]);
 
-        for_object
-            .connect_ex(
-                "script_changed",
-                &Callable::from_object_method(&self.to_gd(), "init_script_instance")
-                    .bindv(&callbale_args),
-            )
-            .flags(ConnectFlags::ONE_SHOT.ord() as u32)
-            .done();
+        for_object.connect_flags(
+            "script_changed",
+            &Callable::from_object_method(&self.to_gd(), "init_script_instance")
+                .bindv(&callbale_args),
+            ConnectFlags::ONE_SHOT,
+        );
 
         create_script_instance(instance, for_object)
     }
@@ -426,11 +428,11 @@ impl IScriptExtension for RustScript {
             };
 
             // clear script to destroy script instance.
-            object.set_script(&Variant::nil());
+            object.set_script(Option::<&Gd<Script>>::None);
 
             self.downgrade_gd(|self_gd| {
                 // re-assign script to create new instance.
-                object.set_script(&self_gd.to_variant());
+                object.set_script(Some(&self_gd));
 
                 if keep_state {
                     property_backup.into_iter().for_each(|(key, value)| {
@@ -464,7 +466,13 @@ impl IScriptExtension for RustScript {
 
     fn instance_has(&self, object: Gd<Object>) -> bool {
         #[expect(unused)]
-        let Some(script): Option<Gd<RustScript>> = object.get_script().try_to().ok() else {
+        let Some(script): Option<Gd<RustScript>> = object
+            .get_script()
+            .map(|script| script.try_cast::<RustScript>())
+            .transpose()
+            .ok()
+            .flatten()
+        else {
             return false;
         };
 
@@ -506,6 +514,6 @@ impl IScriptExtension for RustScript {
 
     #[cfg(since_api = "4.4")]
     fn get_doc_class_name(&self) -> StringName {
-        self.class_name.clone().into()
+        StringName::from(&self.class_name)
     }
 }

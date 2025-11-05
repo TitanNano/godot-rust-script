@@ -43,13 +43,14 @@ where
 
 impl<T> godot::prelude::Var for OnEditor<T>
 where
-    for<'v> T: ToGodot<ToVia<'v> = <T as GodotConvert>::Via> + FromGodot + 'v,
+    for<'v> T: ToGodot + FromGodot + 'v,
     Self: GodotConvert<Via = Option<T::Via>>,
+    T::Via: Clone,
 {
     fn get_property(&self) -> Self::Via {
         match self.value {
             ValueState::Invalid => None,
-            ValueState::Valid(ref value) => Some(value.to_godot()),
+            ValueState::Valid(ref value) => Some(value.to_godot_owned()),
         }
     }
 

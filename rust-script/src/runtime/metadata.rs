@@ -7,7 +7,7 @@
 use std::borrow::Cow;
 use std::ops::Deref;
 
-use godot::meta::{ClassName, MethodInfo, PropertyInfo};
+use godot::meta::{ClassId, MethodInfo, PropertyInfo};
 use godot::obj::{EngineBitfield, EngineEnum};
 use godot::prelude::{Array, Dictionary};
 use godot::sys::VariantType;
@@ -23,7 +23,7 @@ impl ToDictionary for PropertyInfo {
         let mut dict = Dictionary::new();
 
         dict.set("name", self.property_name.clone());
-        dict.set("class_name", self.class_name.to_string_name());
+        dict.set("class_name", self.class_id.to_string_name());
         dict.set("type", self.variant_type.ord());
         dict.set("hint", self.hint_info.hint.ord());
         dict.set("hint_string", self.hint_info.hint_string.clone());
@@ -94,7 +94,7 @@ fn variant_type_to_str(var_type: VariantType) -> &'static str {
     }
 }
 
-fn prop_doc_type(prop_type: VariantType, class_name: ClassName) -> Cow<'static, str> {
+fn prop_doc_type(prop_type: VariantType, class_name: ClassId) -> Cow<'static, str> {
     match prop_type {
         VariantType::OBJECT => class_name.to_cow_str(),
         _ => variant_type_to_str(prop_type).into(),
@@ -117,7 +117,7 @@ impl ToMethodDoc for MethodInfo {
             dict.set("name", self.method_name.clone());
             dict.set(
                 "return_type",
-                prop_doc_type(self.return_type.variant_type, self.return_type.class_name).as_ref(),
+                prop_doc_type(self.return_type.variant_type, self.return_type.class_id).as_ref(),
             );
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
@@ -194,7 +194,7 @@ impl ToArgumentDoc for PropertyInfo {
             dict.set("name", self.property_name.clone());
             dict.set(
                 "type",
-                prop_doc_type(self.variant_type, self.class_name).as_ref(),
+                prop_doc_type(self.variant_type, self.class_id).as_ref(),
             );
         })
     }
@@ -218,7 +218,7 @@ impl ToPropertyDoc for PropertyInfo {
             dict.set("name", self.property_name.clone());
             dict.set(
                 "type",
-                prop_doc_type(self.variant_type, self.class_name).as_ref(),
+                prop_doc_type(self.variant_type, self.class_id).as_ref(),
             );
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);

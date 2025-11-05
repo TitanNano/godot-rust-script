@@ -25,7 +25,7 @@ pub fn godot_script_impl(
     let godot_types = godot_types();
     let string_name_ty = string_name_ty();
     let variant_ty = variant_ty();
-    let call_error_ty = quote!(#godot_types::sys::GDExtensionCallErrorType);
+    let call_error_ty = quote!(#godot_types::meta::error::CallErrorType);
     let property_hints = property_hints();
 
     let current_type = &body.self_ty;
@@ -73,7 +73,7 @@ pub fn godot_script_impl(
                                 ::godot_rust_script::private_export::RustScriptPropDesc {
                                     name: stringify!(#arg_name),
                                     ty: #arg_type,
-                                    class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_name(),
+                                    class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
                                     exported: false,
                                     hint: #property_hints::NONE,
                                     hint_string: String::new(),
@@ -84,10 +84,10 @@ pub fn godot_script_impl(
                             quote_spanned! {
                                 arg.span() =>
                                 #godot_types::prelude::FromGodot::try_from_variant(
-                                    args.get(#index).ok_or(#godot_types::sys::GDEXTENSION_CALL_ERROR_TOO_FEW_ARGUMENTS)?
+                                    args.get(#index).ok_or(#call_error_ty::TooFewArguments)?
                                 ).map_err(|err| {
                                     #godot_types::global::godot_error!("failed to convert variant for argument {} of {}: {}", stringify!(#arg_name), #fn_name_str,  err);
-                                    #godot_types::sys::GDEXTENSION_CALL_ERROR_INVALID_ARGUMENT
+                                    #call_error_ty::InvalidArgument
                                 })?,
                             }
                         )
@@ -104,7 +104,7 @@ pub fn godot_script_impl(
                 fnc.span() =>
                 #fn_name_str => {
                     if args.len() > #arg_count {
-                        return Err(#godot_types::sys::GDEXTENSION_CALL_ERROR_TOO_MANY_ARGUMENTS);
+                        return Err(#call_error_ty::TooManyArguments);
                     }
 
                     Ok(#godot_types::prelude::ToGodot::to_variant(&self.#fn_name(#args)))
@@ -134,7 +134,7 @@ pub fn godot_script_impl(
                     return_type: ::godot_rust_script::private_export::RustScriptPropDesc {
                         name: #fn_name_str,
                         ty: #fn_return_ty,
-                        class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_name(),
+                        class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
                         exported: false,
                         hint: #property_hints::NONE,
                         hint_string: String::new(),
@@ -164,7 +164,7 @@ pub fn godot_script_impl(
                 match name.to_string().as_str() {
                     #method_dispatch
 
-                    _ => Err(#godot_types::sys::GDEXTENSION_CALL_ERROR_INVALID_METHOD),
+                    _ => Err(#call_error_ty::InvalidMethod),
                 }
             }
         }

@@ -8,6 +8,7 @@ use std::any::Any;
 use std::{collections::HashMap, ops::DerefMut};
 
 use godot::classes::Script;
+use godot::meta::error::CallErrorType;
 use godot::meta::{MethodInfo, PropertyInfo};
 use godot::obj::script::{ScriptInstance, SiMut};
 use godot::prelude::{GString, Gd, Object, StringName, Variant, VariantType};
@@ -58,7 +59,7 @@ pub trait GodotScriptObject {
         method: StringName,
         args: &[&Variant],
         context: GenericContext,
-    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType>;
+    ) -> Result<Variant, CallErrorType>;
     fn to_string(&self) -> String;
     fn property_state(&self) -> HashMap<StringName, Variant>;
 
@@ -79,7 +80,7 @@ impl<T: GodotScript + 'static> GodotScriptObject for T {
         method: StringName,
         args: &[&Variant],
         context: GenericContext,
-    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
+    ) -> Result<Variant, CallErrorType> {
         GodotScript::call(self, method, args, Context::from(context))
     }
 
@@ -153,7 +154,7 @@ impl ScriptInstance for RustScriptInstance {
         mut this: SiMut<Self>,
         method: StringName,
         args: &[&Variant],
-    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
+    ) -> Result<Variant, CallErrorType> {
         let cell: *const _ = &this.data;
 
         let base = this.base_mut();
@@ -291,8 +292,8 @@ impl ScriptInstance for RustScriptPlaceholder {
         _this: SiMut<Self>,
         _method: StringName,
         _args: &[&Variant],
-    ) -> Result<Variant, godot::sys::GDExtensionCallErrorType> {
-        Err(godot::sys::GDEXTENSION_CALL_ERROR_INVALID_METHOD)
+    ) -> Result<Variant, CallErrorType> {
+        Err(CallErrorType::InvalidMethod)
     }
 
     fn get_script(&self) -> &Gd<Script> {

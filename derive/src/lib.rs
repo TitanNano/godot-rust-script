@@ -28,7 +28,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let godot_types = godot_types();
     let variant_ty = variant_ty();
     let string_name_ty = string_name_ty();
-    let call_error_ty = quote!(#godot_types::sys::GDExtensionCallErrorType);
+    let call_error_ty = quote!(#godot_types::meta::error::CallErrorType);
 
     let base_class = opts
         .base
@@ -409,7 +409,7 @@ fn derive_field_metadata(
         ::godot_rust_script::private_export::RustScriptPropDesc {
             name: #name,
             ty: #ty,
-            class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_name(),
+            class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
             exported: #is_exported,
             hint: #hint,
             hint_string: #hint_string,

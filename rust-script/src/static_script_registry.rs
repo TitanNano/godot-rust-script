@@ -5,13 +5,13 @@
  */
 
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::sync::{Arc, LazyLock, RwLock};
+use std::sync::Arc;
 
 use godot::builtin::{GString, StringName};
 use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
-use godot::meta::{ClassName, MethodInfo, PropertyHintInfo, PropertyInfo, ToGodot};
+use godot::meta::{ClassId, MethodInfo, PropertyHintInfo, PropertyInfo, ToGodot};
 use godot::obj::{EngineBitfield, EngineEnum};
 use godot::prelude::{Gd, Object};
 use godot::sys::VariantType;
@@ -29,7 +29,7 @@ macro_rules! register_script_class {
             $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
                 class_name: stringify!($class_name),
                 class_name_cstr: ::std::ffi::CStr::from_bytes_with_nul(concat!(stringify!($class_name), "\0").as_bytes()).unwrap(),
-                base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_name().to_cow_str(),
+                base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_id().to_cow_str(),
                 properties: || {
                     $props
                 },
@@ -83,7 +83,7 @@ pub enum RegistryItem {
 pub struct RustScriptPropDesc {
     pub name: &'static str,
     pub ty: VariantType,
-    pub class_name: ClassName,
+    pub class_name: ClassId,
     pub exported: bool,
     pub hint: PropertyHint,
     pub hint_string: String,
@@ -208,7 +208,6 @@ pub fn assemble_metadata<'a>(
 
             RustScriptMetaData::new(
                 class.class_name,
-                class.class_name_cstr,
                 class.base_type_name.as_ref().into(),
                 props,
                 methods,
@@ -225,7 +224,7 @@ pub fn assemble_metadata<'a>(
 pub struct RustScriptPropertyInfo {
     pub variant_type: VariantType,
     pub property_name: &'static str,
-    pub class_name: ClassName,
+    pub class_name: ClassId,
     pub hint: i32,
     pub hint_string: String,
     pub usage: u64,
@@ -237,7 +236,7 @@ impl From<&RustScriptPropertyInfo> for PropertyInfo {
         Self {
             variant_type: value.variant_type,
             property_name: value.property_name.into(),
-            class_name: value.class_name,
+            class_id: value.class_name,
             hint_info: PropertyHintInfo {
                 hint: PropertyHint::try_from_ord(value.hint).unwrap_or(PropertyHint::NONE),
                 hint_string: value.hint_string.to_godot(),
@@ -266,7 +265,7 @@ impl From<&RustScriptMethodInfo> for MethodInfo {
         Self {
             id: value.id,
             method_name: value.method_name.into(),
-            class_name: ClassName::new_script(value.class_name, value.class_name_cstr),
+            class_name: ClassId::__alloc_next_unicode(value.class_name),
             return_type: (&value.return_type).into(),
             arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
             default_arguments: vec![],
@@ -287,10 +286,10 @@ impl From<&RustScriptSignalInfo> for MethodInfo {
         Self {
             id: 0,
             method_name: value.name.into(),
-            class_name: ClassName::none(),
+            class_name: ClassId::none(),
             return_type: PropertyInfo {
                 variant_type: VariantType::NIL,
-                class_name: ClassName::none(),
+                class_id: ClassId::none(),
                 property_name: StringName::default(),
                 hint_info: PropertyHintInfo {
                     hint: PropertyHint::NONE,
@@ -307,7 +306,7 @@ impl From<&RustScriptSignalInfo> for MethodInfo {
 
 #[derive(Debug, Clone)]
 pub struct RustScriptMetaData {
-    pub(crate) class_name: ClassName,
+    pub(crate) class_name: ClassId,
     pub(crate) base_type_name: StringName,
     pub(crate) properties: Box<[RustScriptPropertyInfo]>,
     pub(crate) methods: Box<[RustScriptMethodInfo]>,
@@ -317,10 +316,8 @@ pub struct RustScriptMetaData {
 }
 
 impl RustScriptMetaData {
-    #[expect(clippy::too_many_arguments)]
     pub fn new(
         class_name: &'static str,
-        class_name_cstr: &'static std::ffi::CStr,
         base_type_name: StringName,
         properties: Box<[RustScriptPropertyInfo]>,
         methods: Box<[RustScriptMethodInfo]>,
@@ -329,7 +326,7 @@ impl RustScriptMetaData {
         description: &'static str,
     ) -> Self {
         Self {
-            class_name: ClassName::new_script(class_name, class_name_cstr),
+            class_name: ClassId::__alloc_next_unicode(class_name),
 
             base_type_name,
             properties,
@@ -342,7 +339,7 @@ impl RustScriptMetaData {
 }
 
 impl RustScriptMetaData {
-    pub fn class_name(&self) -> ClassName {
+    pub fn class_name(&self) -> ClassId {
         self.class_name
     }
 
@@ -384,43 +381,13 @@ where
     }
 }
 
-static DYNAMIC_INDEX_BY_CLASS_NAME: LazyLock<RwLock<HashMap<&'static str, ClassName>>> =
-    LazyLock::new(RwLock::default);
-
-trait ClassNameExtension {
-    fn new_script(str: &'static str, cstr: &'static std::ffi::CStr) -> Self;
-}
-
-impl ClassNameExtension for ClassName {
-    fn new_script(str: &'static str, cstr: &'static std::ffi::CStr) -> Self {
-        // Check if class name exists.
-        if let Some(name) = DYNAMIC_INDEX_BY_CLASS_NAME.read().unwrap().get(str) {
-            return *name;
-        }
-
-        let mut map = DYNAMIC_INDEX_BY_CLASS_NAME.write().unwrap();
-
-        let class_name = *map.entry(str).or_insert_with(|| {
-            if str.is_ascii() {
-                ClassName::alloc_next_ascii(cstr)
-            } else {
-                ClassName::alloc_next_unicode(str)
-            }
-        });
-
-        class_name
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use godot::meta::ClassName;
-
-    use crate::static_script_registry::ClassNameExtension;
+    use godot::meta::ClassId;
 
     #[test]
     fn new_class_name() {
-        let script_name = ClassName::new_script("TestScript", c"TestScript");
+        let script_name = ClassId::__alloc_next_unicode("TestScript");
 
         assert_eq!(script_name.to_cow_str(), "TestScript");
     }
@@ -428,7 +395,7 @@ mod tests {
     #[cfg(since_api = "4.4")]
     #[test]
     fn new_unicode_class_name() {
-        let script_name = ClassName::new_script("ÜbertragungsScript", c"ÜbertragungsScript");
+        let script_name = ClassId::__alloc_next_unicode("ÜbertragungsScript");
 
         assert_eq!(script_name.to_cow_str(), "ÜbertragungsScript");
     }
