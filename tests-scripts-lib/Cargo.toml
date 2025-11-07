@@ -9,3 +9,5 @@ crate-type = ["dylib", "rlib"]
 [dependencies]
 godot-rust-script = { path = "../rust-script", features = ["scripts"] }
 
+[lints]
+workspace = true
