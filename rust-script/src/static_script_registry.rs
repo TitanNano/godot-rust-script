@@ -5,9 +5,9 @@
  */
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock, RwLock};
 
 use godot::builtin::{GString, StringName};
 use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
@@ -265,7 +265,7 @@ impl From<&RustScriptMethodInfo> for MethodInfo {
         Self {
             id: value.id,
             method_name: value.method_name.into(),
-            class_name: ClassId::__alloc_next_unicode(value.class_name),
+            class_name: get_class_id(value.class_name),
             return_type: (&value.return_type).into(),
             arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
             default_arguments: vec![],
@@ -326,7 +326,7 @@ impl RustScriptMetaData {
         description: &'static str,
     ) -> Self {
         Self {
-            class_name: ClassId::__alloc_next_unicode(class_name),
+            class_name: get_class_id(class_name),
 
             base_type_name,
             properties,
@@ -381,9 +381,26 @@ where
     }
 }
 
+fn get_class_id(class_name: &'static str) -> ClassId {
+    static SCRIPT_CLASS_NAMES: LazyLock<RwLock<HashMap<&'static str, ClassId>>> =
+        LazyLock::new(|| RwLock::new(HashMap::new()));
+
+    if let Some(class_id) = SCRIPT_CLASS_NAMES.read().unwrap().get(class_name) {
+        return *class_id;
+    }
+
+    *SCRIPT_CLASS_NAMES
+        .write()
+        .unwrap()
+        .entry(class_name)
+        .or_insert_with(|| ClassId::__alloc_next_unicode(class_name))
+}
+
 #[cfg(test)]
 mod tests {
     use godot::meta::ClassId;
+
+    use crate::static_script_registry::get_class_id;
 
     #[test]
     fn new_class_name() {
@@ -398,5 +415,13 @@ mod tests {
         let script_name = ClassId::__alloc_next_unicode("ÜbertragungsScript");
 
         assert_eq!(script_name.to_cow_str(), "ÜbertragungsScript");
+    }
+
+    #[test]
+    fn cached_class_id() {
+        let script_name_a = get_class_id("CachedTestScript");
+        let script_name_b = get_class_id("CachedTestScript");
+
+        assert_eq!(script_name_a, script_name_b);
     }
 }
