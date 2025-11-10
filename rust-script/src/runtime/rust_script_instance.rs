@@ -131,13 +131,29 @@ impl ScriptInstance for RustScriptInstance {
 
     fn set_property(this: SiMut<Self>, name: StringName, value: &Variant) -> bool {
         let cell_ref = &this.data;
-        let mut mut_data = cell_ref.borrow_mut().unwrap();
+        let mut mut_data = match cell_ref.borrow_mut() {
+            Ok(guard) => guard,
+            Err(err) => {
+                panic!(
+                    "Error while writing to script property {}::{name}: {err}",
+                    this.script.bind().get_class_name()
+                );
+            }
+        };
 
         mut_data.set(name, value.to_owned())
     }
 
     fn get_property(&self, name: StringName) -> Option<Variant> {
-        let guard = self.data.borrow().unwrap();
+        let guard = match self.data.borrow() {
+            Ok(guard) => guard,
+            Err(err) => {
+                panic!(
+                    "Error while reading script property {}::{name}: {err}",
+                    self.script.bind().get_class_name()
+                );
+            }
+        };
 
         guard.get(name)
     }
@@ -159,10 +175,25 @@ impl ScriptInstance for RustScriptInstance {
 
         let base = this.base_mut();
 
-        let mut data_guard = unsafe { &*cell }.borrow_mut().unwrap();
+        // SAFETY: cell pointer was just created and is valid. It will not out-live the current function.
+        let mut data_guard = match unsafe { &*cell }.borrow_mut() {
+            Ok(guard) => guard,
+            Err(err) => {
+                drop(base);
+
+                panic!(
+                    "Error while calling script function {}::{}: {}",
+                    this.script.bind().get_class_name(),
+                    method,
+                    err
+                );
+            }
+        };
         let data = data_guard.deref_mut();
         let data_ptr = data as *mut _;
 
+        // SAFETY: cell & data_ptr are valid for the duration of the call. The context can not out-live the current function as it's tied
+        // to the lifetime of the base ref.
         let context = unsafe { GenericContext::new(cell, data_ptr, base) };
 
         data.call(method, args, context)
