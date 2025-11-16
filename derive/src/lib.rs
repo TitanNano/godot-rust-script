@@ -40,13 +40,13 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let fields = opts.data.take_struct().unwrap().fields;
 
     let (
-        field_metadata,
+        (field_metadata, field_errors),
         signal_metadata,
         get_fields_dispatch,
         set_fields_dispatch,
         export_field_state,
     ): (
-        TokenStream,
+        (TokenStream, TokenStream),
         (TokenStream, TokenStream),
         TokenStream,
         TokenStream,
@@ -69,19 +69,21 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             let is_signal = signal_attr.is_some();
 
             let field_metadata = match (is_public, is_exported, is_signal) {
-                (false, false, _) | (true, false, true) => TokenStream::default(),
+                (false, false, _) | (true, false, true) => {
+                    (TokenStream::default(), TokenStream::default())
+                }
                 (false, true, _) => {
                     let err = compile_error("Only public fields can be exported!", export_attr);
 
-                    quote! {#err,}
+                    (TokenStream::default(), err)
                 }
-                (true, _, false) => {
-                    derive_field_metadata(field, is_exported).unwrap_or_else(|err| err)
-                }
+                (true, _, false) => derive_field_metadata(field, is_exported)
+                    .map(|tokens| (tokens, TokenStream::default()))
+                    .unwrap_or_else(|err| (TokenStream::default(), err)),
                 (true, true, true) => {
                     let err = compile_error("Signals can not be exported!", export_attr);
 
-                    quote! {#err,}
+                    (TokenStream::default(), err)
                 }
             };
 
@@ -97,7 +99,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 (false, true) => {
                     let err = compile_error("Signals must be public!", signal_attr);
 
-                    (quote! {#err,}, TokenStream::default())
+                    (err, TokenStream::default())
                 }
             };
 
@@ -159,6 +161,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         }
 
         #signal_const_assert
+        #field_errors
 
         ::godot_rust_script::register_script_class!(
             #script_type_ident,
