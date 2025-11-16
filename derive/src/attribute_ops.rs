@@ -269,7 +269,12 @@ impl FieldExportOps {
             }
 
             let step = ops.parsed.step.unwrap_or(1.0);
-            let hint_string = format!("{},{},{}", ops.parsed.min, ops.parsed.max, step);
+            let suffix = ops.parsed.suffix.as_deref().unwrap_or("");
+
+            let hint_string = format!(
+                "{},{},{},suffix:{}",
+                ops.parsed.min, ops.parsed.max, step, suffix
+            );
 
             result = Some(ExportMetadata {
                 field: FIELD,
@@ -387,6 +392,7 @@ struct ExportRangeOps {
     min: f64,
     max: f64,
     step: Option<f64>,
+    suffix: Option<String>,
 }
 
 #[derive(FromMeta, Debug)]
