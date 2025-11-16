@@ -6,6 +6,7 @@
 
 use godot::builtin::{Array, GString};
 use godot::classes::{Node, Node3D};
+use godot::global::PropertyHint;
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{
     godot_script_impl, CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef,
@@ -58,14 +59,15 @@ struct TestScript {
     #[export(range(min = 0.0, max = 10.0))]
     pub int_range: u32,
 
-    #[export]
+    #[export(storage)]
     pub custom_enum: ScriptEnum,
 
     #[export]
     pub script_ref_opt: Option<RsRef<TestScript>>,
 
-    #[export]
+    #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
     pub script_ref: OnEditor<RsRef<TestScript>>,
+
     base: Gd<<Self as GodotScript>::Base>,
 }
 

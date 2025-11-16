@@ -10,7 +10,7 @@ use godot::builtin::{
     Callable, Dictionary, GString, NodePath, StringName, Variant, Vector2, Vector3, Vector4,
 };
 use godot::classes::Object;
-use godot::global::{Error, PropertyHint};
+use godot::global::{Error, PropertyHint, PropertyUsageFlags};
 use godot::meta::{ByValue, GodotConvert, GodotType, ToGodot};
 use godot::obj::{Gd, GodotClass};
 
@@ -113,7 +113,7 @@ macro_rules! signal_argument_desc {
             name: $name,
             ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::VARIANT_TYPE.variant_as_nil(),
             class_name: <<$type as GodotConvert>::Via as GodotType>::class_id(),
-            exported: false,
+            usage: PropertyUsageFlags::NONE,
             hint: PropertyHint::NONE,
             hint_string: String::new(),
             description: "",
