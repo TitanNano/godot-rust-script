@@ -9,15 +9,16 @@ mod enums;
 mod impl_attribute;
 mod type_paths;
 
-use attribute_ops::{FieldOpts, GodotScriptOpts};
 use darling::{util::SpannedValue, FromAttributes, FromDeriveInput, FromMeta};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
-use type_paths::{godot_types, property_hints, string_name_ty, variant_ty};
 
-use crate::attribute_ops::{FieldExportOps, FieldSignalOps, PropertyOpts};
+use crate::attribute_ops::{
+    ExportMetadata, FieldExportOps, FieldOpts, FieldSignalOps, GodotScriptOpts, PropertyOpts,
+};
+use crate::type_paths::{godot_types, property_hints, property_usage, string_name_ty, variant_ty};
 
 #[proc_macro_derive(GodotScript, attributes(export, script, prop, signal))]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -383,6 +384,7 @@ fn derive_field_metadata(
 ) -> Result<TokenStream, TokenStream> {
     let godot_types = godot_types();
     let property_hint_ty = property_hints();
+    let property_usage_ty = property_usage();
     let name = field
         .ident
         .as_ref()
@@ -392,19 +394,30 @@ fn derive_field_metadata(
     let rust_ty = &field.ty;
     let ty = rust_to_variant_type(&field.ty)?;
 
-    let (hint, hint_string) = is_exported
+    let ExportMetadata {
+        field: _,
+        usage,
+        hint,
+        hint_string,
+    } = is_exported
         .then(|| {
             let ops =
                 FieldExportOps::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
+            let span = field
+                .attrs
+                .iter()
+                .find(|attr| attr.path().is_ident("export"))
+                .expect("FieldExportOps already succeded")
+                .span();
 
-            ops.hint(&field.ty)
+            ops.to_export_meta(&field.ty, span)
         })
         .transpose()?
-        .unwrap_or_else(|| {
-            (
-                quote_spanned!(field.span()=> #property_hint_ty::NONE),
-                quote_spanned!(field.span()=> String::new()),
-            )
+        .unwrap_or_else(|| ExportMetadata {
+            field: "",
+            usage: quote_spanned!(field.span() => #property_usage_ty::SCRIPT_VARIABLE),
+            hint: quote_spanned!(field.span()=> #property_hint_ty::NONE),
+            hint_string: quote_spanned!(field.span()=> String::new()),
         });
 
     let description = get_field_description(field);
@@ -413,7 +426,7 @@ fn derive_field_metadata(
             name: #name,
             ty: #ty,
             class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
-            exported: #is_exported,
+            usage: #usage,
             hint: #hint,
             hint_string: #hint_string,
             description: concat!(#description),
@@ -530,7 +543,7 @@ fn extract_ident_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream
         Type::Macro(_) => Err(compile_error("Macro types are not supported!", impl_target)),
         Type::Never(_) => Err(compile_error("Never type is not supported!", impl_target)),
         Type::Paren(_) => Err(compile_error("Unsupported type!", impl_target)),
-        Type::Path(ref path) => Ok(path.path.segments.last().unwrap().ident.clone()),
+        Type::Path(path) => Ok(path.path.segments.last().unwrap().ident.clone()),
         Type::Ptr(_) => Err(compile_error(
             "Pointer types are not supported!",
             impl_target,

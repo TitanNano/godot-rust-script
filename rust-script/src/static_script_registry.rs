@@ -84,7 +84,7 @@ pub struct RustScriptPropDesc {
     pub name: &'static str,
     pub ty: VariantType,
     pub class_name: ClassId,
-    pub exported: bool,
+    pub usage: PropertyUsageFlags,
     pub hint: PropertyHint,
     pub hint_string: String,
     pub description: &'static str,
@@ -96,11 +96,7 @@ impl RustScriptPropDesc {
             variant_type: self.ty,
             class_name: self.class_name,
             property_name: self.name,
-            usage: if self.exported {
-                (PropertyUsageFlags::EDITOR | PropertyUsageFlags::STORAGE).ord()
-            } else {
-                PropertyUsageFlags::NONE.ord()
-            },
+            usage: self.usage.ord(),
             hint: self.hint.ord(),
             hint_string: self.hint_string.clone(),
             description: self.description,
