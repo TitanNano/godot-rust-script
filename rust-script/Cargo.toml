@@ -28,3 +28,6 @@ godot-bindings.workspace = true
 default = ["runtime", "scripts"]
 runtime = ["dep:itertools", "dep:rand"]
 scripts = ["dep:godot-rust-script-derive"]
+
+[lints]
+workspace = true
