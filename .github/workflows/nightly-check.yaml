@@ -31,8 +31,8 @@ jobs:
     - name: Build Debug
       run: |
         set -o pipefail
-        cargo build --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json
+        cargo build --workspace --features "godot/api-${{ matrix.api_version}}" --all-features
     - name: Build Release
       run: |
         set -o pipefail
-        cargo build --release --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json
+        cargo build --release --workspace --features "godot/api-${{ matrix.api_version}}" --all-features
