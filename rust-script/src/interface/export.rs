@@ -7,10 +7,10 @@
 #[cfg(since_api = "4.3")]
 use godot::builtin::PackedVector4Array;
 use godot::builtin::{
-    Aabb, Array, Basis, Callable, Color, Dictionary, GString, NodePath, PackedByteArray,
-    PackedColorArray, PackedFloat32Array, PackedFloat64Array, PackedInt32Array, PackedInt64Array,
-    PackedStringArray, PackedVector2Array, PackedVector3Array, Plane, Projection, Quaternion,
-    Rect2, Rect2i, Rid, StringName, Transform2D, Transform3D, Vector2, Vector2i, Vector3, Vector3i,
+    Aabb, Array, Basis, Callable, Color, GString, NodePath, PackedByteArray, PackedColorArray,
+    PackedFloat32Array, PackedFloat64Array, PackedInt32Array, PackedInt64Array, PackedStringArray,
+    PackedVector2Array, PackedVector3Array, Plane, Projection, Quaternion, Rect2, Rect2i, Rid,
+    StringName, Transform2D, Transform3D, VarDictionary, Vector2, Vector2i, Vector3, Vector3i,
     Vector4, Vector4i,
 };
 use godot::classes::{Node, Resource};
@@ -208,6 +208,6 @@ default_export!(u8);
 
 default_export!(Callable);
 default_export!(godot::builtin::Signal);
-default_export!(Dictionary);
+default_export!(VarDictionary);
 
 default_export!(Rid);

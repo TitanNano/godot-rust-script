@@ -15,8 +15,8 @@ use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::script::create_script_instance;
 use godot::obj::{EngineBitfield, InstanceId, Singleton as _, WithBaseField};
 use godot::prelude::{
-    godot_api, Array, Base, Callable, Dictionary, GString, Gd, GodotClass, StringName, Variant,
-    VariantArray,
+    godot_api, Array, Base, Callable, GString, Gd, GodotClass, StringName, VarArray, VarDictionary,
+    Variant,
 };
 
 use crate::apply::Apply;
@@ -193,7 +193,7 @@ impl IScriptExtension for RustScript {
         let data = self.create_remote_instance(for_object.clone());
         let instance = RustScriptInstance::new(data, for_object.clone(), self.to_gd());
 
-        let callbale_args = VariantArray::from(&[for_object.to_variant()]);
+        let callbale_args = VarArray::from(&[for_object.to_variant()]);
 
         for_object.connect_flags(
             "script_changed",
@@ -227,7 +227,7 @@ impl IScriptExtension for RustScript {
         Variant::nil()
     }
 
-    fn get_script_signal_list(&self) -> Array<Dictionary> {
+    fn get_script_signal_list(&self) -> Array<VarDictionary> {
         let Some(script) = RustScriptLanguage::script_meta_data(&self.str_class_name()) else {
             godot_error!(
                 "RustScript class {} does not exist in compiled dynamic library!",
@@ -260,7 +260,7 @@ impl IScriptExtension for RustScript {
 
     fn update_exports(&mut self) {}
 
-    fn get_script_method_list(&self) -> Array<Dictionary> {
+    fn get_script_method_list(&self) -> Array<VarDictionary> {
         let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
 
         reg.get(&self.str_class_name())
@@ -274,7 +274,7 @@ impl IScriptExtension for RustScript {
             .unwrap_or_default()
     }
 
-    fn get_script_property_list(&self) -> Array<Dictionary> {
+    fn get_script_property_list(&self) -> Array<VarDictionary> {
         let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
 
         reg.get(&self.str_class_name())
@@ -299,10 +299,10 @@ impl IScriptExtension for RustScript {
         })
     }
 
-    fn get_constants(&self) -> Dictionary {
-        Dictionary::new()
+    fn get_constants(&self) -> VarDictionary {
+        VarDictionary::new()
     }
-    fn get_method_info(&self, method_name: StringName) -> Dictionary {
+    fn get_method_info(&self, method_name: StringName) -> VarDictionary {
         let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
 
         reg.get(&self.str_class_name())
@@ -316,11 +316,11 @@ impl IScriptExtension for RustScript {
             .unwrap_or_default()
     }
 
-    fn get_documentation(&self) -> Array<Dictionary> {
+    fn get_documentation(&self) -> Array<VarDictionary> {
         let (methods, props, signals, description): (
-            Array<Dictionary>,
-            Array<Dictionary>,
-            Array<Dictionary>,
+            Array<VarDictionary>,
+            Array<VarDictionary>,
+            Array<VarDictionary>,
             &'static str,
         ) = {
             let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
@@ -358,21 +358,21 @@ impl IScriptExtension for RustScript {
                 .unwrap_or_default()
         };
 
-        let class_doc = Dictionary::new().apply(|dict| {
+        let class_doc = VarDictionary::new().apply(|dict| {
             dict.set(GString::from("name"), self.get_class_name());
             dict.set(GString::from("inherits"), self.get_instance_base_type());
             dict.set(GString::from("brief_description"), GString::new());
             dict.set(GString::from("description"), description);
-            dict.set(GString::from("tutorials"), VariantArray::new());
-            dict.set(GString::from("constructors"), VariantArray::new());
+            dict.set(GString::from("tutorials"), VarArray::new());
+            dict.set(GString::from("constructors"), VarArray::new());
             dict.set(GString::from("methods"), methods);
-            dict.set(GString::from("operators"), VariantArray::new());
+            dict.set(GString::from("operators"), VarArray::new());
             dict.set(GString::from("signals"), signals);
-            dict.set(GString::from("constants"), VariantArray::new());
-            dict.set(GString::from("enums"), VariantArray::new());
+            dict.set(GString::from("constants"), VarArray::new());
+            dict.set(GString::from("enums"), VarArray::new());
             dict.set(GString::from("properties"), props);
-            dict.set(GString::from("theme_properties"), VariantArray::new());
-            dict.set(GString::from("annotations"), VariantArray::new());
+            dict.set(GString::from("theme_properties"), VarArray::new());
+            dict.set(GString::from("annotations"), VarArray::new());
             dict.set(GString::from("is_deprecated"), false);
             dict.set(GString::from("is_experimental"), false);
             dict.set(GString::from("is_script_doc"), true);

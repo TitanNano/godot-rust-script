@@ -9,18 +9,18 @@ use std::ops::Deref;
 
 use godot::meta::{ClassId, MethodInfo, PropertyInfo};
 use godot::obj::{EngineBitfield, EngineEnum};
-use godot::prelude::{Array, Dictionary};
+use godot::prelude::{Array, VarDictionary};
 use godot::sys::VariantType;
 
 use crate::apply::Apply;
 
 pub(super) trait ToDictionary {
-    fn to_dict(&self) -> Dictionary;
+    fn to_dict(&self) -> VarDictionary;
 }
 
 impl ToDictionary for PropertyInfo {
-    fn to_dict(&self) -> Dictionary {
-        let mut dict = Dictionary::new();
+    fn to_dict(&self) -> VarDictionary {
+        let mut dict = VarDictionary::new();
 
         dict.set("name", self.property_name.clone());
         dict.set("class_name", self.class_id.to_string_name());
@@ -34,8 +34,8 @@ impl ToDictionary for PropertyInfo {
 }
 
 impl ToDictionary for MethodInfo {
-    fn to_dict(&self) -> Dictionary {
-        Dictionary::new().apply(|dict| {
+    fn to_dict(&self) -> VarDictionary {
+        VarDictionary::new().apply(|dict| {
             dict.set("name", self.method_name.clone());
             dict.set("flags", self.flags.ord());
 
@@ -102,18 +102,18 @@ fn prop_doc_type(prop_type: VariantType, class_name: ClassId) -> Cow<'static, st
 }
 
 pub trait ToMethodDoc {
-    fn to_method_doc(&self) -> Dictionary;
+    fn to_method_doc(&self) -> VarDictionary;
 }
 
 impl ToMethodDoc for MethodInfo {
-    fn to_method_doc(&self) -> Dictionary {
-        let args: Array<Dictionary> = self
+    fn to_method_doc(&self) -> VarDictionary {
+        let args: Array<VarDictionary> = self
             .arguments
             .iter()
             .map(|arg| arg.to_argument_doc())
             .collect();
 
-        Dictionary::new().apply(|dict| {
+        VarDictionary::new().apply(|dict| {
             dict.set("name", self.method_name.clone());
             dict.set(
                 "return_type",
@@ -127,7 +127,7 @@ impl ToMethodDoc for MethodInfo {
 }
 
 impl<T: ToMethodDoc> ToMethodDoc for Documented<T> {
-    fn to_method_doc(&self) -> Dictionary {
+    fn to_method_doc(&self) -> VarDictionary {
         self.inner
             .to_method_doc()
             .apply(|dict| dict.set("description", self.description))
@@ -185,12 +185,12 @@ impl<T: Clone> Clone for Documented<T> {
 }
 
 pub trait ToArgumentDoc {
-    fn to_argument_doc(&self) -> Dictionary;
+    fn to_argument_doc(&self) -> VarDictionary;
 }
 
 impl ToArgumentDoc for PropertyInfo {
-    fn to_argument_doc(&self) -> Dictionary {
-        Dictionary::new().apply(|dict| {
+    fn to_argument_doc(&self) -> VarDictionary {
+        VarDictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
             dict.set(
                 "type",
@@ -201,7 +201,7 @@ impl ToArgumentDoc for PropertyInfo {
 }
 
 impl<T: ToArgumentDoc> ToArgumentDoc for Documented<T> {
-    fn to_argument_doc(&self) -> Dictionary {
+    fn to_argument_doc(&self) -> VarDictionary {
         self.inner.to_argument_doc().apply(|dict| {
             dict.set("description", self.description);
         })
@@ -209,12 +209,12 @@ impl<T: ToArgumentDoc> ToArgumentDoc for Documented<T> {
 }
 
 pub trait ToPropertyDoc {
-    fn to_property_doc(&self) -> Dictionary;
+    fn to_property_doc(&self) -> VarDictionary;
 }
 
 impl ToPropertyDoc for PropertyInfo {
-    fn to_property_doc(&self) -> Dictionary {
-        Dictionary::new().apply(|dict| {
+    fn to_property_doc(&self) -> VarDictionary {
+        VarDictionary::new().apply(|dict| {
             dict.set("name", self.property_name.clone());
             dict.set(
                 "type",
@@ -227,7 +227,7 @@ impl ToPropertyDoc for PropertyInfo {
 }
 
 impl<T: ToPropertyDoc> ToPropertyDoc for Documented<T> {
-    fn to_property_doc(&self) -> Dictionary {
+    fn to_property_doc(&self) -> VarDictionary {
         self.inner
             .to_property_doc()
             .apply(|dict| dict.set("description", self.description))

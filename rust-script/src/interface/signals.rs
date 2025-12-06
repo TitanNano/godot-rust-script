@@ -7,7 +7,7 @@
 use std::marker::PhantomData;
 
 use godot::builtin::{
-    Callable, Dictionary, GString, NodePath, StringName, Variant, Vector2, Vector3, Vector4,
+    Callable, GString, NodePath, StringName, VarDictionary, Variant, Vector2, Vector3, Vector4,
 };
 use godot::classes::Object;
 use godot::global::{Error, PropertyHint, PropertyUsageFlags};
@@ -123,8 +123,24 @@ macro_rules! signal_argument_desc {
 
 tuple_args!(A1, A2, A3, A4, A5, A6, A7, A8, A9, A10);
 single_args!(
-    bool, u8, u16, u32, u64, i8, i16, i32, i64, f32, f64, GString, StringName, NodePath, Vector2,
-    Vector3, Vector4, Dictionary
+    bool,
+    u8,
+    u16,
+    u32,
+    u64,
+    i8,
+    i16,
+    i32,
+    i64,
+    f32,
+    f64,
+    GString,
+    StringName,
+    NodePath,
+    Vector2,
+    Vector3,
+    Vector4,
+    VarDictionary
 );
 
 impl<T: GodotClass> SignalArguments for Gd<T> {
