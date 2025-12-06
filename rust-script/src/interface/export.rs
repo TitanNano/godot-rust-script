@@ -23,6 +23,9 @@ use godot::sys::GodotFfi;
 
 use super::{GodotScript, OnEditor, RsRef};
 
+/// Represents a type that can be used for an exported script property.
+///
+/// Types that implement this trait can be used for exported properties. The trait provides the necessary meta-data to the engine.
 pub trait GodotScriptExport {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String;
 
