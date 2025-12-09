@@ -12,7 +12,6 @@ use std::sync::{Arc, LazyLock, RwLock};
 use godot::builtin::{GString, StringName};
 use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
 use godot::meta::{ClassId, MethodInfo, PropertyHintInfo, PropertyInfo, ToGodot};
-use godot::obj::{EngineBitfield, EngineEnum};
 use godot::prelude::{Gd, Object};
 use godot::sys::VariantType;
 
@@ -45,14 +44,15 @@ macro_rules! register_script_class {
 
 #[macro_export]
 macro_rules! register_script_methods {
-    ($class_name:ty, $methods:expr) => {
+    ($class_name:ty, $method_capacity:literal, $builder:ident => $methods:tt) => {
         $crate::private_export::plugin_add! {
             $crate::private_export::SCRIPT_REGISTRY ;
-            $crate::private_export::RegistryItem::Methods($crate::private_export::RustScriptEntryMethods {
-                class_name: stringify!($class_name),
-                methods: || {
-                    $methods
-                },
+            $crate::private_export::RegistryItem::Methods(|| {
+                let mut $builder = $crate::private_export::RustScriptEntryMethods::builder(stringify!($class_name), $method_capacity);
+
+                $methods
+
+                $builder.build()
             })
         }
     };
@@ -70,16 +70,46 @@ pub struct RustScriptEntry {
 
 #[derive(Debug)]
 pub struct RustScriptEntryMethods {
-    pub class_name: &'static str,
-    pub methods: fn() -> Vec<RustScriptMethodDesc>,
+    class_name: &'static str,
+    methods: Box<[RustScriptMethodDesc]>,
+}
+
+impl RustScriptEntryMethods {
+    pub fn builder(class_name: &'static str, capacity: usize) -> RustScriptEntryMethodsBuilder {
+        RustScriptEntryMethodsBuilder {
+            class_name,
+            methods: Vec::with_capacity(capacity),
+        }
+    }
+}
+
+pub struct RustScriptEntryMethodsBuilder {
+    class_name: &'static str,
+    methods: Vec<RustScriptMethodDesc>,
+}
+
+impl RustScriptEntryMethodsBuilder {
+    pub fn add_method(&mut self, method: RustScriptMethodDescBuilder) {
+        let index = self.methods.len();
+
+        self.methods
+            .push(method.build(index as u32, self.class_name));
+    }
+
+    pub fn build(self) -> RustScriptEntryMethods {
+        RustScriptEntryMethods {
+            class_name: self.class_name,
+            methods: self.methods.into(),
+        }
+    }
 }
 
 pub enum RegistryItem {
     Entry(RustScriptEntry),
-    Methods(RustScriptEntryMethods),
+    Methods(fn() -> RustScriptEntryMethods),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RustScriptPropDesc {
     pub name: &'static str,
     pub ty: VariantType,
@@ -90,70 +120,70 @@ pub struct RustScriptPropDesc {
     pub description: &'static str,
 }
 
-impl RustScriptPropDesc {
-    pub fn to_property_info(&self) -> RustScriptPropertyInfo {
-        RustScriptPropertyInfo {
-            variant_type: self.ty,
-            class_name: self.class_name,
-            property_name: self.name,
-            usage: self.usage.ord(),
-            hint: self.hint.ord(),
-            hint_string: self.hint_string.clone(),
-            description: self.description,
-        }
-    }
-}
-
+#[derive(Debug, Clone)]
 pub struct RustScriptMethodDesc {
-    pub name: &'static str,
-    pub return_type: RustScriptPropDesc,
-    pub arguments: Box<[RustScriptPropDesc]>,
-    pub flags: MethodFlags,
-    pub description: &'static str,
+    pub(crate) id: u32,
+    pub(crate) class_name: &'static str,
+    pub(crate) name: &'static str,
+    pub(crate) return_type: RustScriptPropDesc,
+    pub(crate) arguments: Box<[RustScriptPropDesc]>,
+    pub(crate) flags: MethodFlags,
+    pub(crate) description: &'static str,
 }
 
 impl RustScriptMethodDesc {
-    pub fn into_method_info(
-        self,
-        id: i32,
-        class_name: &'static str,
-        class_name_cstr: &'static std::ffi::CStr,
-    ) -> RustScriptMethodInfo {
-        RustScriptMethodInfo {
+    pub fn builder(
+        name: &'static str,
+        arguments: Box<[RustScriptPropDesc]>,
+        return_type: RustScriptPropDesc,
+    ) -> RustScriptMethodDescBuilder {
+        RustScriptMethodDescBuilder {
+            name,
+            return_type,
+            arguments,
+            flags: MethodFlags::NORMAL,
+            description: Default::default(),
+        }
+    }
+}
+
+pub struct RustScriptMethodDescBuilder {
+    name: &'static str,
+    return_type: RustScriptPropDesc,
+    arguments: Box<[RustScriptPropDesc]>,
+    flags: MethodFlags,
+    description: &'static str,
+}
+
+impl RustScriptMethodDescBuilder {
+    pub fn with_flags(mut self, flags: MethodFlags) -> Self {
+        self.flags = flags;
+        self
+    }
+
+    pub fn with_description(mut self, description: &'static str) -> Self {
+        self.description = description;
+        self
+    }
+
+    pub fn build(self, id: u32, class_name: &'static str) -> RustScriptMethodDesc {
+        RustScriptMethodDesc {
             id,
-            method_name: self.name,
             class_name,
-            class_name_cstr,
-            return_type: self.return_type.to_property_info(),
-            flags: self.flags.ord(),
-            arguments: self
-                .arguments
-                .iter()
-                .map(|arg| arg.to_property_info())
-                .collect(),
+            name: self.name,
+            return_type: self.return_type,
+            arguments: self.arguments,
+            flags: self.flags,
             description: self.description,
         }
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct RustScriptSignalDesc {
     pub name: &'static str,
     pub arguments: Box<[RustScriptPropDesc]>,
     pub description: &'static str,
-}
-
-impl From<RustScriptSignalDesc> for RustScriptSignalInfo {
-    fn from(value: RustScriptSignalDesc) -> Self {
-        Self {
-            name: value.name,
-            arguments: value
-                .arguments
-                .iter()
-                .map(|arg| arg.to_property_info())
-                .collect(),
-            description: value.description,
-        }
-    }
 }
 
 pub fn create_default_data_struct<T: GodotScript + GodotScriptObject + 'static>(
@@ -168,7 +198,11 @@ pub fn assemble_metadata<'a>(
     let (entries, methods): (Vec<_>, Vec<_>) = items
         .map(|item| match item {
             RegistryItem::Entry(entry) => (Some(entry), None),
-            RegistryItem::Methods(methods) => (None, Some((methods.class_name, methods))),
+            RegistryItem::Methods(methods) => {
+                let methods = methods();
+
+                (None, Some((methods.class_name, methods)))
+            }
         })
         .unzip();
 
@@ -178,26 +212,15 @@ pub fn assemble_metadata<'a>(
         .into_iter()
         .flatten()
         .map(|class| {
-            let props = (class.properties)()
-                .into_iter()
-                .map(|prop| prop.to_property_info())
-                .collect();
+            let props = (class.properties)().into();
 
             let methods = methods
                 .get(class.class_name)
                 .into_iter()
-                .flat_map(|entry| (entry.methods)())
-                .enumerate()
-                .map(|(index, method)| {
-                    method.into_method_info(
-                        (index + 1) as i32,
-                        class.class_name,
-                        class.class_name_cstr,
-                    )
-                })
+                .flat_map(|entry| entry.methods.clone())
                 .collect();
 
-            let signals = (class.signals)().into_iter().map(Into::into).collect();
+            let signals = (class.signals)().into();
 
             let create_data: Box<dyn CreateScriptInstanceData> = Box::new(class.create_data);
             let description = class.description;
@@ -215,70 +238,23 @@ pub fn assemble_metadata<'a>(
         .collect()
 }
 
-#[derive(Debug, Clone)]
-#[repr(C)]
-pub struct RustScriptPropertyInfo {
-    pub variant_type: VariantType,
-    pub property_name: &'static str,
-    pub class_name: ClassId,
-    pub hint: i32,
-    pub hint_string: String,
-    pub usage: u64,
-    pub description: &'static str,
-}
-
-impl From<&RustScriptPropertyInfo> for PropertyInfo {
-    fn from(value: &RustScriptPropertyInfo) -> Self {
+impl From<&RustScriptPropDesc> for PropertyInfo {
+    fn from(value: &RustScriptPropDesc) -> Self {
         Self {
-            variant_type: value.variant_type,
-            property_name: value.property_name.into(),
+            variant_type: value.ty,
+            property_name: value.name.into(),
             class_id: value.class_name,
             hint_info: PropertyHintInfo {
-                hint: PropertyHint::try_from_ord(value.hint).unwrap_or(PropertyHint::NONE),
+                hint: value.hint,
                 hint_string: value.hint_string.to_godot(),
             },
-            usage: PropertyUsageFlags::try_from_ord(value.usage)
-                .unwrap_or(PropertyUsageFlags::NONE),
+            usage: value.usage,
         }
     }
 }
 
-#[derive(Debug, Clone)]
-#[repr(C)]
-pub struct RustScriptMethodInfo {
-    pub id: i32,
-    pub method_name: &'static str,
-    pub class_name: &'static str,
-    pub class_name_cstr: &'static std::ffi::CStr,
-    pub return_type: RustScriptPropertyInfo,
-    pub arguments: Box<[RustScriptPropertyInfo]>,
-    pub flags: u64,
-    pub description: &'static str,
-}
-
-impl From<&RustScriptMethodInfo> for MethodInfo {
-    fn from(value: &RustScriptMethodInfo) -> Self {
-        Self {
-            id: value.id,
-            method_name: value.method_name.into(),
-            class_name: get_class_id(value.class_name),
-            return_type: (&value.return_type).into(),
-            arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
-            default_arguments: vec![],
-            flags: MethodFlags::try_from_ord(value.flags).unwrap_or(MethodFlags::DEFAULT),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct RustScriptSignalInfo {
-    pub name: &'static str,
-    pub arguments: Box<[RustScriptPropertyInfo]>,
-    pub description: &'static str,
-}
-
-impl From<&RustScriptSignalInfo> for MethodInfo {
-    fn from(value: &RustScriptSignalInfo) -> Self {
+impl From<&RustScriptSignalDesc> for MethodInfo {
+    fn from(value: &RustScriptSignalDesc) -> Self {
         Self {
             id: 0,
             method_name: value.name.into(),
@@ -300,13 +276,30 @@ impl From<&RustScriptSignalInfo> for MethodInfo {
     }
 }
 
-#[derive(Debug, Clone)]
+impl From<RustScriptMethodDesc> for MethodInfo {
+    fn from(value: RustScriptMethodDesc) -> Self {
+        Self {
+            id: value
+                .id
+                .try_into()
+                .expect("method index should fit into i32"),
+            method_name: value.name.into(),
+            class_name: get_class_id(value.class_name),
+            return_type: (&value.return_type).into(),
+            flags: value.flags,
+            arguments: value.arguments.iter().map(|arg| arg.into()).collect(),
+            default_arguments: Vec::with_capacity(0),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct RustScriptMetaData {
     pub(crate) class_name: ClassId,
     pub(crate) base_type_name: StringName,
-    pub(crate) properties: Box<[RustScriptPropertyInfo]>,
-    pub(crate) methods: Box<[RustScriptMethodInfo]>,
-    pub(crate) signals: Box<[RustScriptSignalInfo]>,
+    pub(crate) properties: Box<[RustScriptPropDesc]>,
+    pub(crate) methods: Box<[RustScriptMethodDesc]>,
+    pub(crate) signals: Box<[RustScriptSignalDesc]>,
     pub(crate) create_data: Arc<dyn CreateScriptInstanceData>,
     pub(crate) description: &'static str,
 }
@@ -315,9 +308,9 @@ impl RustScriptMetaData {
     pub fn new(
         class_name: &'static str,
         base_type_name: StringName,
-        properties: Box<[RustScriptPropertyInfo]>,
-        methods: Box<[RustScriptMethodInfo]>,
-        signals: Box<[RustScriptSignalInfo]>,
+        properties: Box<[RustScriptPropDesc]>,
+        methods: Box<[RustScriptMethodDesc]>,
+        signals: Box<[RustScriptSignalDesc]>,
         create_data: Box<dyn CreateScriptInstanceData>,
         description: &'static str,
     ) -> Self {
@@ -347,15 +340,15 @@ impl RustScriptMetaData {
         self.create_data.create(base)
     }
 
-    pub fn properties(&self) -> &[RustScriptPropertyInfo] {
+    pub fn properties(&self) -> &[RustScriptPropDesc] {
         &self.properties
     }
 
-    pub fn methods(&self) -> &[RustScriptMethodInfo] {
+    pub fn methods(&self) -> &[RustScriptMethodDesc] {
         &self.methods
     }
 
-    pub fn signals(&self) -> &[RustScriptSignalInfo] {
+    pub fn signals(&self) -> &[RustScriptSignalDesc] {
         &self.signals
     }
 
@@ -394,9 +387,14 @@ fn get_class_id(class_name: &'static str) -> ClassId {
 
 #[cfg(test)]
 mod tests {
-    use godot::meta::ClassId;
+    use godot::global::PropertyHint;
+    use godot::global::PropertyUsageFlags;
+    use godot::{meta::ClassId, sys::VariantType};
 
-    use crate::static_script_registry::get_class_id;
+    use crate::{
+        private_export::{RustScriptEntryMethods, RustScriptMethodDesc},
+        static_script_registry::get_class_id,
+    };
 
     #[test]
     fn new_class_name() {
@@ -419,5 +417,30 @@ mod tests {
         let script_name_b = get_class_id("CachedTestScript");
 
         assert_eq!(script_name_a, script_name_b);
+    }
+
+    #[test]
+    fn build_method_list() {
+        let mut builder = RustScriptEntryMethods::builder("TestClass", 4);
+
+        builder.add_method(RustScriptMethodDesc::builder(
+            "add_member",
+            Box::new([]),
+            super::RustScriptPropDesc {
+                name: "",
+                ty: VariantType::BOOL,
+                class_name: get_class_id("Node"),
+                usage: PropertyUsageFlags::NONE,
+                hint: PropertyHint::NONE,
+                hint_string: String::from(""),
+                description: "",
+            },
+        ));
+
+        let entry = builder.build();
+
+        assert_eq!(entry.methods[0].class_name, "TestClass");
+        assert_eq!(entry.methods[0].name, "add_member");
+        assert_eq!(entry.methods[0].return_type.ty, VariantType::BOOL);
     }
 }

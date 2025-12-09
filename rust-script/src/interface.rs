@@ -213,7 +213,7 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
 
 /// Script property access indirection
 ///
-/// gdext uses this kind of indirection to allow conversion of the actual property value into a godot compatible type when accessing the
+/// Gdext uses this kind of indirection to allow conversion of the actual property value into a Godot compatible type when accessing the
 /// property from the engine. This Trait separates the `::godot::prelude::Var` trait into it's get and set components for more granular
 /// requirements on the property types.
 pub trait GetScriptProperty: GodotConvert {
@@ -222,7 +222,7 @@ pub trait GetScriptProperty: GodotConvert {
 
 /// Script property write indirection
 ///
-/// gdext uses this kind of indirection to allow conversion of the actual property value from a godot compatible type when setting the
+/// Gdext uses this kind of indirection to allow conversion of the actual property value from a Godot compatible type when setting the
 /// property from the engine. This Trait separates the `::godot::prelude::Var` trait into it's get and set components for more granular
 /// requirements on the property types.
 pub trait SetScriptProperty: GodotConvert {

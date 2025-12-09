@@ -27,7 +27,13 @@ fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
         .read()
         .expect("script registry is inaccessible")
         .get(&class_name)
-        .map(|meta| meta.methods().iter().map(MethodInfo::from).collect())
+        .map(|meta| {
+            meta.methods()
+                .iter()
+                .cloned()
+                .map(MethodInfo::from)
+                .collect()
+        })
         .unwrap_or_else(|| Box::new([]) as Box<[MethodInfo]>);
 
     methods
