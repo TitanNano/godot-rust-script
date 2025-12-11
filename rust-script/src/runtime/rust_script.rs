@@ -20,7 +20,7 @@ use godot::prelude::{
 };
 
 use crate::apply::Apply;
-use crate::static_script_registry::RustScriptPropertyInfo;
+use crate::private_export::RustScriptPropDesc;
 
 use super::rust_script_instance::GodotScriptObject;
 use super::{
@@ -39,7 +39,7 @@ pub(crate) struct RustScript {
     #[var(get = get_class_name, set = set_class_name, usage_flags = [STORAGE])]
     class_name: GString,
 
-    /// dummy property that stores the onwer ids when the extension gets reloaded by the engine.
+    /// Dummy property that stores the owner ids when the extension gets reloaded by the engine.
     #[var( get = owner_ids, set = set_owner_ids, usage_flags = [STORAGE])]
     #[allow(dead_code)]
     owner_ids: Array<i64>,
@@ -94,7 +94,7 @@ impl RustScript {
     #[func]
     fn set_owner_ids(&mut self, ids: Array<i64>) {
         if ids.is_empty() {
-            // ignore empty owners list from engine
+            // Ignore empty owners list from engine
             return;
         }
 
@@ -133,7 +133,7 @@ impl RustScript {
         base.call("_init", &[]);
     }
 
-    fn map_property_info_list<R>(&self, f: impl Fn(&RustScriptPropertyInfo) -> R) -> Vec<R> {
+    fn map_property_info_list<R>(&self, f: impl Fn(&RustScriptPropDesc) -> R) -> Vec<R> {
         let reg = SCRIPT_REGISTRY.read().expect("unable to obtain read lock");
 
         reg.get(&self.str_class_name())
@@ -218,44 +218,48 @@ impl IScriptExtension for RustScript {
     }
 
     fn has_property_default_value(&self, _property: StringName) -> bool {
-        // default values are currently not exposed
+        // Default values are currently not exposed
         false
     }
 
     fn get_property_default_value(&self, #[expect(unused)] property: StringName) -> Variant {
-        // default values are currently not exposed
+        // Default values are currently not exposed
         Variant::nil()
     }
 
     fn get_script_signal_list(&self) -> Array<VarDictionary> {
-        let Some(script) = RustScriptLanguage::script_meta_data(&self.str_class_name()) else {
-            godot_error!(
-                "RustScript class {} does not exist in compiled dynamic library!",
-                self.str_class_name()
-            );
-            return Array::new();
-        };
+        RustScriptLanguage::with_script_metadata(&self.str_class_name(), |script_data| {
+            let Some(script) = script_data else {
+                godot_error!(
+                    "RustScript class {} does not exist in compiled dynamic library!",
+                    self.str_class_name()
+                );
+                return Array::new();
+            };
 
-        script
-            .signals()
-            .iter()
-            .map(|signal| MethodInfo::from(signal).to_dict())
-            .collect()
+            script
+                .signals()
+                .iter()
+                .map(|signal| MethodInfo::from(signal).to_dict())
+                .collect()
+        })
     }
 
     fn has_script_signal(&self, name: StringName) -> bool {
-        let Some(script) = RustScriptLanguage::script_meta_data(&self.str_class_name()) else {
-            godot_error!(
-                "RustScript class {} does not exist in compiled dynamic library!",
-                self.str_class_name()
-            );
-            return false;
-        };
+        RustScriptLanguage::with_script_metadata(&self.str_class_name(), |script_data| {
+            let Some(script) = script_data else {
+                godot_error!(
+                    "RustScript class {} does not exist in compiled dynamic library!",
+                    self.str_class_name()
+                );
+                return false;
+            };
 
-        script
-            .signals()
-            .iter()
-            .any(|signal| signal.name == name.to_string())
+            script
+                .signals()
+                .iter()
+                .any(|signal| signal.name == name.to_string())
+        })
     }
 
     fn update_exports(&mut self) {}
@@ -268,7 +272,7 @@ impl IScriptExtension for RustScript {
                 class
                     .methods()
                     .iter()
-                    .map(|method| MethodInfo::from(method).to_dict())
+                    .map(|method| MethodInfo::from(method.clone()).to_dict())
                     .collect()
             })
             .unwrap_or_default()
@@ -295,7 +299,7 @@ impl IScriptExtension for RustScript {
             class
                 .methods()
                 .iter()
-                .any(|method| method.method_name == method_name.to_string())
+                .any(|method| method.name == method_name.to_string())
         })
     }
 
@@ -310,8 +314,8 @@ impl IScriptExtension for RustScript {
                 class
                     .methods()
                     .iter()
-                    .find(|method| method.method_name == method_name.to_string())
-                    .map(|method| MethodInfo::from(method).to_dict())
+                    .find(|method| method.name == method_name.to_string())
+                    .map(|method| MethodInfo::from(method.clone()).to_dict())
             })
             .unwrap_or_default()
     }
@@ -386,10 +390,10 @@ impl IScriptExtension for RustScript {
         true
     }
 
-    // godot script reload hook
+    // Godot script reload hook
     fn reload(
         &mut self,
-        // before 4.4 the engine does not correctly pass the keep_state flag
+        // Before 4.4 the engine does not correctly pass the keep_state flag
         #[cfg_attr(before_api = "4.4", expect(unused_variables))] keep_state: bool,
     ) -> godot::global::Error {
         #[cfg(before_api = "4.4")]
@@ -398,7 +402,9 @@ impl IScriptExtension for RustScript {
         let owners = self.owners.borrow().clone();
         let exported_properties_list = if keep_state {
             self.map_property_info_list(|prop| {
-                (prop.usage & PropertyUsageFlags::EDITOR.ord() != 0).then_some(prop.property_name)
+                (prop.usage.ord() & PropertyUsageFlags::EDITOR.ord()
+                    != PropertyUsageFlags::NONE.ord())
+                .then_some(prop.name)
             })
         } else {
             Vec::with_capacity(0)
@@ -427,7 +433,7 @@ impl IScriptExtension for RustScript {
                 Vec::with_capacity(0)
             };
 
-            // clear script to destroy script instance.
+            // Clear script to destroy script instance.
             object.set_script(Option::<&Gd<Script>>::None);
 
             self.downgrade_gd(|self_gd| {
@@ -497,7 +503,7 @@ impl IScriptExtension for RustScript {
                 class
                     .properties()
                     .iter()
-                    .map(|prop| StringName::from(prop.property_name))
+                    .map(|prop| StringName::from(prop.name))
                     .collect()
             })
             .unwrap_or_default()

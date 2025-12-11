@@ -62,12 +62,14 @@ impl RustScriptLanguage {
             .map(|gd| gd.cast())
     }
 
-    pub fn script_meta_data(class_name: &str) -> Option<RustScriptMetaData> {
-        let reg = SCRIPT_REGISTRY
-            .read()
-            .expect("unable to obtain read access");
+    #[inline]
+    pub fn with_script_metadata<R>(
+        class_name: &str,
+        lambda: impl FnOnce(Option<&RustScriptMetaData>) -> R,
+    ) -> R {
+        let reg = SCRIPT_REGISTRY.read().expect("registry is poisoned");
 
-        reg.get(class_name).map(ToOwned::to_owned)
+        lambda(reg.get(class_name))
     }
 }
 
@@ -89,10 +91,10 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         true
     }
 
-    /// thread enter hook will be called before entering a thread
+    /// Thread enter hook will be called before entering a thread
     fn thread_enter(&mut self) {}
 
-    /// thread exit hook will be called before leaving a thread
+    /// Thread exit hook will be called before leaving a thread
     fn thread_exit(&mut self) {}
 
     fn get_public_functions(&self) -> Array<VarDictionary> {
@@ -184,13 +186,15 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     fn get_global_class_name(&self, path: GString) -> VarDictionary {
         let class_name = Self::path_to_class_name(&path);
 
-        let Some(script) = Self::script_meta_data(&class_name) else {
-            return VarDictionary::new();
-        };
+        Self::with_script_metadata(&class_name, |script_data| {
+            let Some(script) = script_data else {
+                return VarDictionary::new();
+            };
 
-        VarDictionary::new().apply(|dict| {
-            dict.set("name", class_name);
-            dict.set("base_type", script.base_type_name());
+            VarDictionary::new().apply(|dict| {
+                dict.set("name", &*class_name);
+                dict.set("base_type", script.base_type_name());
+            })
         })
     }
 
@@ -204,7 +208,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         _line: i32,
         _col: i32,
     ) -> global::Error {
-        // TODO: From Godot 4.4 we can show an editor toast here. Just waiting for a new gdext release.
+        // TODO: From Godot 4.4 we can show an editor toast here. Just waiting for a new Gdext release.
         godot_error!("Editing rust scripts from inside Godot is currently not supported.");
 
         global::Error::OK

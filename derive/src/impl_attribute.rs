@@ -112,9 +112,9 @@ pub fn godot_script_impl(
             };
 
             let method_flag = if is_static {
-                quote!(#godot_types::global::MethodFlags::STATIC)
+                quote!(.with_flags(#godot_types::global::MethodFlags::STATIC))
             } else {
-                quote!(#godot_types::global::MethodFlags::NORMAL)
+                TokenStream::new()
             };
 
             let description = fnc.attrs.iter()
@@ -128,31 +128,37 @@ pub fn godot_script_impl(
 
             let metadata = quote_spanned! {
                 fnc.span() =>
-                ::godot_rust_script::private_export::RustScriptMethodDesc {
-                    name: #fn_name_str,
-                    arguments: Box::new([#args_meta]),
-                    return_type: ::godot_rust_script::private_export::RustScriptPropDesc {
-                        name: #fn_name_str,
-                        ty: #fn_return_ty,
-                        class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
-                        usage: #godot_types::global::PropertyUsageFlags::NONE,
-                        hint: #property_hints::NONE,
-                        hint_string: String::new(),
-                        description: "",
-                    },
-                    flags: #method_flag,
-                    description: concat!(#description),
-                },
+                methods.add_method(
+                    ::godot_rust_script::private_export::RustScriptMethodDesc::builder(
+                        #fn_name_str,
+                        Box::new([#args_meta]),
+                        ::godot_rust_script::private_export::RustScriptPropDesc {
+                            name: #fn_name_str,
+                            ty: #fn_return_ty,
+                            class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
+                            usage: #godot_types::global::PropertyUsageFlags::NONE,
+                            hint: #property_hints::NONE,
+                            hint_string: String::new(),
+                            description: "",
+                        },
+                    )
+                    .with_description(concat!(#description))
+                    #method_flag
+                );
             };
 
             Ok((dispatch, metadata))
         })
         .collect();
 
-    let (method_dispatch, method_metadata): (TokenStream, TokenStream) = match result {
-        Ok(r) => r.into_iter().unzip(),
+    let method_list = match result {
+        Ok(r) => r,
         Err(err) => return err,
     };
+
+    let method_count = method_list.len();
+    let (method_dispatch, method_metadata): (TokenStream, TokenStream) =
+        method_list.into_iter().unzip();
 
     let trait_impl = quote_spanned! {
         current_type.span() =>
@@ -173,9 +179,10 @@ pub fn godot_script_impl(
     let metadata = quote! {
         ::godot_rust_script::register_script_methods!(
             #current_type,
-            vec![
+            #method_count,
+            methods => {
                 #method_metadata
-            ]
+            }
         );
     };
 
