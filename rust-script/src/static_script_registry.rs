@@ -22,7 +22,7 @@ godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 
 #[macro_export]
 macro_rules! register_script_class {
-    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr) => {
+    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr, $is_tool: literal) => {
         $crate::private_export::plugin_add! {
             $crate::private_export::SCRIPT_REGISTRY;
             $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
@@ -37,6 +37,7 @@ macro_rules! register_script_class {
                 },
                 create_data: $crate::private_export::create_default_data_struct::<$class_name>,
                 description: $desc,
+                is_tool: $is_tool,
             })
         }
     };
@@ -66,6 +67,7 @@ pub struct RustScriptEntry {
     pub signals: fn() -> Vec<RustScriptSignalDesc>,
     pub create_data: fn(Gd<Object>) -> Box<dyn GodotScriptObject>,
     pub description: &'static str,
+    pub is_tool: bool,
 }
 
 #[derive(Debug)]
@@ -234,6 +236,7 @@ pub fn assemble_metadata<'a>(
                 create_data,
                 description,
             )
+            .with_is_tool(class.is_tool)
         })
         .collect()
 }
@@ -302,6 +305,7 @@ pub struct RustScriptMetaData {
     pub(crate) signals: Box<[RustScriptSignalDesc]>,
     pub(crate) create_data: Arc<dyn CreateScriptInstanceData>,
     pub(crate) description: &'static str,
+    pub(crate) is_tool: bool,
 }
 
 impl RustScriptMetaData {
@@ -323,7 +327,13 @@ impl RustScriptMetaData {
             signals,
             create_data: Arc::from(create_data),
             description,
+            is_tool: false,
         }
+    }
+
+    pub fn with_is_tool(mut self, is_tool: bool) -> Self {
+        self.is_tool = is_tool;
+        self
     }
 }
 

@@ -23,7 +23,7 @@ pub enum ScriptEnum {
 }
 
 #[derive(GodotScript, Debug)]
-#[script(base = Node)]
+#[script(base = Node, tool)]
 struct TestScript {
     pub property_a: GString,
 

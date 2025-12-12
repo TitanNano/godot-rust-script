@@ -422,6 +422,7 @@ pub struct GodotScriptOpts {
     pub ident: syn::Ident,
     pub data: Data<util::Ignored, SpannedValue<FieldOpts>>,
     pub base: Option<syn::Ident>,
+    pub tool: Option<()>,
     pub attrs: Vec<syn::Attribute>,
 }
 

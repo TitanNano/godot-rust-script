@@ -24,7 +24,12 @@ use crate::type_paths::{godot_types, property_hints, property_usage, string_name
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let opts = GodotScriptOpts::from_derive_input(&input).unwrap();
+    let opts = match GodotScriptOpts::from_derive_input(&input) {
+        Ok(opts) => opts,
+        Err(err) => {
+            return err.write_errors().into();
+        }
+    };
 
     let godot_types = godot_types();
     let variant_ty = variant_ty();
@@ -38,6 +43,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
     let script_type_ident = opts.ident;
     let class_name = script_type_ident.to_string();
+    let is_tool = opts.tool.is_some();
     let fields = opts.data.take_struct().unwrap().fields;
 
     let (
@@ -173,7 +179,8 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             ],
             vec![
                 #signal_metadata
-            ]
+            ],
+            #is_tool
         );
 
     };
