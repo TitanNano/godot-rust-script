@@ -391,8 +391,14 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         Array::default()
     }
 
-    #[expect(unused_variables)]
-    fn reload_tool_script(&mut self, script: Option<Gd<Script>>, soft_reload: bool) {}
+    fn reload_tool_script(&mut self, script: Option<Gd<Script>>, soft_reload: bool) {
+        let Some(mut script) = script else {
+            godot_error!("[RustScript] Can not null tool script!");
+            return;
+        };
+
+        script.reload_ex().keep_state(soft_reload).done();
+    }
     fn profiling_start(&mut self) {}
     fn profiling_stop(&mut self) {}
 

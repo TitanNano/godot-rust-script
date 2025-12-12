@@ -184,7 +184,17 @@ impl IScriptExtension for RustScript {
     }
 
     fn is_tool(&self) -> bool {
-        false
+        RustScriptLanguage::with_script_metadata(&self.str_class_name(), |metadata| {
+            let Some(script) = metadata else {
+                godot_error!(
+                    "RustScript class {} does not exist in compiled dynamic library!",
+                    self.str_class_name()
+                );
+                return false;
+            };
+
+            script.is_tool
+        })
     }
 
     unsafe fn instance_create_rawptr(&self, mut for_object: Gd<Object>) -> *mut c_void {
