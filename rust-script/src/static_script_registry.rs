@@ -20,6 +20,7 @@ use crate::runtime::GodotScriptObject;
 
 godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! register_script_class {
     ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr, $is_tool: literal) => {
@@ -43,6 +44,7 @@ macro_rules! register_script_class {
     };
 }
 
+#[doc(hidden)]
 #[macro_export]
 macro_rules! register_script_methods {
     ($class_name:ty, $method_capacity:literal, $builder:ident => $methods:tt) => {
