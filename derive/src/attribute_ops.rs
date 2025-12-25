@@ -408,7 +408,7 @@ struct ExportCustomOps {
 }
 
 #[derive(FromField, Debug)]
-#[darling(forward_attrs(export, prop, doc, signal))]
+#[darling(forward_attrs(export, export_group, export_subgroup, prop, doc, signal))]
 pub struct FieldOpts {
     pub ident: Option<syn::Ident>,
     pub attrs: Vec<syn::Attribute>,
@@ -438,4 +438,16 @@ pub struct ExportMetadata {
     pub usage: TokenStream,
     pub hint: TokenStream,
     pub hint_string: TokenStream,
+}
+
+#[derive(FromAttributes, Debug)]
+#[darling(attributes(export_group))]
+pub struct ExportGroup {
+    pub name: String,
+}
+
+#[derive(FromAttributes, Debug)]
+#[darling(attributes(export_subgroup))]
+pub struct ExportSubgroup {
+    pub name: String,
 }

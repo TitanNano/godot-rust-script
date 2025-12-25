@@ -3,6 +3,7 @@ resolver = "2"
 members = [
   "rust-script",
   "derive",
+  "integration-test"
 ]
 
 [workspace.package]
