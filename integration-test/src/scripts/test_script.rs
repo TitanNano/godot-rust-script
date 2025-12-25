@@ -56,6 +56,7 @@ struct TestScript {
     #[export]
     pub node_array: Array<Gd<Node3D>>,
 
+    #[export_group(name = "prop_group")]
     #[export(range(min = 0.0, max = 10.0))]
     pub int_range: u32,
 
@@ -65,6 +66,7 @@ struct TestScript {
     #[export]
     pub script_ref_opt: Option<RsRef<TestScript>>,
 
+    #[export_subgroup(name = "Refs")]
     #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
     pub script_ref: OnEditor<RsRef<TestScript>>,
 

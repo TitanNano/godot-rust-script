@@ -1,0 +1,14 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.5
+reloadable = true
+
+[libraries]
+macos.debug.arm64="res://../target/aarch64-apple-darwin/debug/libintegration_test.dylib"
+macos.release.arm64="res://../target/aarch64-apple-darwin/release/libintegration_test.dylib"
+macos.debug.x86_64="res://../target/x86_64-apple-darwin/debug/libintegration_test.dylib"
+macos.release.x86_64="res://../target/x86_64-apple-darwin/release/libintegration_test.dylib"
+windows.debug.x86_64="res://../target/x86_64-pc-windows-msvc/debug/integration_test.dll"
+windows.release.x86_64="res://../target/x86_64-pc-windows-msvc/release/integration_test.dll"
+linux.debug.x86_64="res://../target/x86_64-unknown-linux-gnu/debug/libintegration_test.so"
+linux.release.x86_64="res://../target/x86_64-unknown-linux-gnu/release/libintegration_test.so"

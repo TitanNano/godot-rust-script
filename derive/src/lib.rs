@@ -16,11 +16,15 @@ use quote::{quote, quote_spanned, ToTokens};
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
 
 use crate::attribute_ops::{
-    ExportMetadata, FieldExportOps, FieldOpts, FieldSignalOps, GodotScriptOpts, PropertyOpts,
+    ExportGroup, ExportMetadata, ExportSubgroup, FieldExportOps, FieldOpts, FieldSignalOps,
+    GodotScriptOpts, PropertyOpts,
 };
 use crate::type_paths::{godot_types, property_hints, property_usage, string_name_ty, variant_ty};
 
-#[proc_macro_derive(GodotScript, attributes(export, script, prop, signal))]
+#[proc_macro_derive(
+    GodotScript,
+    attributes(export, export_group, export_subgroup, script, prop, signal)
+)]
 pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -400,6 +404,8 @@ fn derive_field_metadata(
 
     let rust_ty = &field.ty;
     let ty = rust_to_variant_type(&field.ty)?;
+    let group = derive_export_group(field).transpose()?;
+    let subgroup = derive_export_subgroup(field).transpose()?;
 
     let ExportMetadata {
         field: _,
@@ -429,6 +435,8 @@ fn derive_field_metadata(
 
     let description = get_field_description(field);
     let item = quote! {
+        #group
+        #subgroup
         ::godot_rust_script::private_export::RustScriptPropDesc {
             name: #name,
             ty: #ty,
@@ -523,6 +531,68 @@ fn derive_signal_metadata(field: &SpannedValue<FieldOpts>) -> (TokenStream, Toke
     };
 
     (metadata, const_assert.unwrap_or_default())
+}
+
+fn derive_export_group(
+    field: &SpannedValue<FieldOpts>,
+) -> Option<Result<TokenStream, TokenStream>> {
+    let godot_types = godot_types();
+    let property_usage_ty = property_usage();
+    let property_hint_ty = property_hints();
+
+    field
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("export_group"))
+        .map(|first_attr| {
+            let group =
+                ExportGroup::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
+
+            let group_name = group.name;
+
+            Ok(quote_spanned! { first_attr.span() =>
+                ::godot_rust_script::private_export::RustScriptPropDesc {
+                    name: #group_name,
+                    ty: #godot_types::sys::VariantType::NIL,
+                    class_name: #godot_types::meta::ClassId::none(),
+                    usage: #property_usage_ty::GROUP,
+                    hint: #property_hint_ty::NONE,
+                    hint_string: String::new(),
+                    description: "",
+                },
+            })
+        })
+}
+
+fn derive_export_subgroup(
+    field: &SpannedValue<FieldOpts>,
+) -> Option<Result<TokenStream, TokenStream>> {
+    let godot_types = godot_types();
+    let property_usage_ty = property_usage();
+    let property_hint_ty = property_hints();
+
+    field
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("export_subgroup"))
+        .map(|first_attr| {
+            let group =
+                ExportSubgroup::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
+
+            let group_name = group.name;
+
+            Ok(quote_spanned! { first_attr.span() =>
+                ::godot_rust_script::private_export::RustScriptPropDesc {
+                    name: #group_name,
+                    ty: #godot_types::sys::VariantType::NIL,
+                    class_name: #godot_types::meta::ClassId::none(),
+                    usage: #property_usage_ty::SUBGROUP,
+                    hint: #property_hint_ty::NONE,
+                    hint_string: String::new(),
+                    description: "",
+                },
+            })
+        })
 }
 
 #[proc_macro_attribute]

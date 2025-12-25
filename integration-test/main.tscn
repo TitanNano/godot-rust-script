@@ -1,0 +1,14 @@
+[gd_scene load_steps=2 format=3 uid="uid://bn6b80q25bhta"]
+
+[ext_resource type="Script" uid="uid://biv3njiuy3gxn" path="res://src/scripts/test_script.rs" id="1_ig7tw"]
+
+[node name="Main" type="Node"]
+
+[node name="TestScript" type="Node" parent="."]
+script = ExtResource("1_ig7tw")
+editor_prop = 0
+enum_prop = 0
+node_array = Array[Node3D]([])
+int_range = 0
+custom_enum = 0
+metadata/_custom_type_script = "uid://biv3njiuy3gxn"

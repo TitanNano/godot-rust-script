@@ -1,0 +1,11 @@
+[package]
+name = "integration-test"
+version = "0.1.0"
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+godot-rust-script = { path = "../rust-script" }
+godot.workspace = true
