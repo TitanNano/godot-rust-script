@@ -9,11 +9,11 @@ mod enums;
 mod impl_attribute;
 mod type_paths;
 
-use darling::{util::SpannedValue, FromAttributes, FromDeriveInput, FromMeta};
+use darling::{FromAttributes, FromDeriveInput, FromMeta, util::SpannedValue};
 use itertools::Itertools;
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
-use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Type};
+use quote::{ToTokens, quote, quote_spanned};
+use syn::{DeriveInput, Ident, Type, parse_macro_input, spanned::Spanned};
 
 use crate::attribute_ops::{
     ExportGroup, ExportMetadata, ExportSubgroup, FieldExportOps, FieldOpts, FieldSignalOps,
@@ -76,33 +76,47 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
             let is_public = matches!(field.vis, syn::Visibility::Public(_))
                 || field.attrs.iter().any(|attr| attr.path().is_ident("prop"));
-            let is_exported = export_attr.is_some();
             let is_signal = signal_attr.is_some();
+            let export_ops = export_attr
+                .is_some()
+                .then(|| {
+                    let ops = FieldExportOps::from_attributes(&field.attrs)
+                        .map_err(|err| err.write_errors())?;
 
-            let field_metadata = match (is_public, is_exported, is_signal) {
-                (false, false, _) | (true, false, true) => {
+                    Result::<FieldExportOps, TokenStream>::Ok(ops)
+                })
+                .transpose()
+                .unwrap();
+            let is_flatten = export_ops
+                .as_ref()
+                .map(|ops| ops.is_flatten())
+                .unwrap_or(false);
+
+            let field_metadata = match (is_public, export_ops, is_signal) {
+                (false, None, _) | (true, None, true) => {
                     (TokenStream::default(), TokenStream::default())
                 }
-                (false, true, _) => {
+                (false, Some(_), _) => {
                     let err = compile_error("Only public fields can be exported!", export_attr);
 
                     (TokenStream::default(), err)
                 }
-                (true, _, false) => derive_field_metadata(field, is_exported)
+                (true, export_ops, false) => derive_field_metadata(field, export_ops)
                     .map(|tokens| (tokens, TokenStream::default()))
                     .unwrap_or_else(|err| (TokenStream::default(), err)),
-                (true, true, true) => {
+                (true, Some(_), true) => {
                     let err = compile_error("Signals can not be exported!", export_attr);
 
                     (TokenStream::default(), err)
                 }
             };
 
-            let get_field_dispatch = is_public.then(|| derive_get_field_dispatch(field));
+            let get_field_dispatch =
+                is_public.then(|| derive_get_field_dispatch(field, is_flatten));
             let set_field_dispatch =
-                (is_public && !is_signal).then(|| derive_set_field_dispatch(field));
+                (is_public && !is_signal).then(|| derive_set_field_dispatch(field, is_flatten));
             let export_field_state =
-                (is_public && !is_signal).then(|| derive_property_state_export(field));
+                (is_public && !is_signal).then(|| derive_property_state_export(field, is_flatten));
 
             let signal_metadata = match (is_public, is_signal) {
                 (false, false) | (true, false) => (TokenStream::default(), TokenStream::default()),
@@ -178,13 +192,11 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             #script_type_ident,
             #base_class,
             concat!(#description),
-            vec![
+            #is_tool,
+            builder => {
                 #field_metadata
-            ],
-            vec![
                 #signal_metadata
-            ],
-            #is_tool
+            }
         );
 
     };
@@ -276,7 +288,7 @@ fn derive_default_with_base(field_opts: &[SpannedValue<FieldOpts>]) -> TokenStre
     }
 }
 
-fn derive_get_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
+fn derive_get_field_dispatch(field: &SpannedValue<FieldOpts>, is_flatten: bool) -> TokenStream {
     let godot_types = godot_types();
 
     let field_ident = field.ident.as_ref().unwrap();
@@ -286,6 +298,17 @@ fn derive_get_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
         Ok(opts) => opts,
         Err(err) => return err.write_errors(),
     };
+
+    if is_flatten {
+        return quote_spanned! { field.ty.span() =>
+            field_name if field_name.starts_with(concat!(#field_name, "_")) => Some(
+                ::godot_rust_script::ScriptPropertyGroup::get_property(
+                    &self.#field_ident,
+                    field_name.strip_prefix(concat!(#field_name, "_")).unwrap(),
+                )
+            ),
+        };
+    }
 
     let accessor = match opts.get {
         Some(getter) => quote_spanned!(getter.span()=> #getter(&self)),
@@ -313,7 +336,7 @@ fn derive_get_fields(get_field_dispatch: TokenStream) -> TokenStream {
     }
 }
 
-fn derive_set_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
+fn derive_set_field_dispatch(field: &SpannedValue<FieldOpts>, is_flatten: bool) -> TokenStream {
     let godot_types = godot_types();
 
     let field_ident = field.ident.as_ref().unwrap();
@@ -323,6 +346,19 @@ fn derive_set_field_dispatch(field: &SpannedValue<FieldOpts>) -> TokenStream {
         Ok(opts) => opts,
         Err(err) => return err.write_errors(),
     };
+
+    if is_flatten {
+        return quote_spanned! { field.ty.span() =>
+            field_name if field_name.starts_with(concat!(#field_name, "_")) => {
+                ::godot_rust_script::ScriptPropertyGroup::set_property(
+                    &mut self.#field_ident,
+                    field_name.strip_prefix(concat!(#field_name, "_")).unwrap(),
+                    value,
+                );
+                true
+            }
+        };
+    }
 
     let variant_value = quote_spanned!(field.ty.span()=> #godot_types::prelude::FromGodot::try_from_variant(&value));
 
@@ -361,7 +397,7 @@ fn derive_set_fields(set_field_dispatch: TokenStream) -> TokenStream {
     }
 }
 
-fn derive_property_state_export(field: &SpannedValue<FieldOpts>) -> TokenStream {
+fn derive_property_state_export(field: &SpannedValue<FieldOpts>, is_flatten: bool) -> TokenStream {
     let string_name_ty = string_name_ty();
 
     let Some(ident) = field.ident.as_ref() else {
@@ -371,8 +407,14 @@ fn derive_property_state_export(field: &SpannedValue<FieldOpts>) -> TokenStream 
     let field_name = ident.to_string();
     let field_string_name = quote!(#string_name_ty::from(#field_name));
 
-    quote! {
-        (#field_string_name, self.get(#field_string_name).unwrap()),
+    if is_flatten {
+        return quote_spanned! { field.span() =>
+            ::godot_rust_script::ScriptPropertyGroup::export_property_states(&self.#ident, #field_name, &mut state);
+        };
+    }
+
+    quote_spanned! { field.span() =>
+        state.insert(#field_string_name, self.get(#field_string_name).unwrap());
     }
 }
 
@@ -382,16 +424,18 @@ fn derive_property_states_export(fetch_property_states: TokenStream) -> TokenStr
 
     quote! {
         fn property_state(&self) -> ::std::collections::HashMap<#string_name_ty, #variant_ty> {
-            ::std::collections::HashMap::from([
-                #fetch_property_states
-            ])
+            let mut state = ::std::collections::HashMap::new();
+
+            #fetch_property_states
+
+            state
         }
     }
 }
 
 fn derive_field_metadata(
     field: &SpannedValue<FieldOpts>,
-    is_exported: bool,
+    export_ops: Option<FieldExportOps>,
 ) -> Result<TokenStream, TokenStream> {
     let godot_types = godot_types();
     let property_hint_ty = property_hints();
@@ -407,15 +451,21 @@ fn derive_field_metadata(
     let group = derive_export_group(field).transpose()?;
     let subgroup = derive_export_subgroup(field).transpose()?;
 
+    if let Some(ref export_ops) = export_ops
+        && export_ops.is_flatten()
+    {
+        return Ok(quote_spanned! { field.span() =>
+            builder.add_property_group(<#rust_ty as ::godot_rust_script::ScriptPropertyGroup>::properties().build(concat!(#name, "_"), ""));
+        });
+    }
+
     let ExportMetadata {
         field: _,
         usage,
         hint,
         hint_string,
-    } = is_exported
-        .then(|| {
-            let ops =
-                FieldExportOps::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
+    } = export_ops
+        .map(|ops| {
             let span = field
                 .attrs
                 .iter()
@@ -434,18 +484,18 @@ fn derive_field_metadata(
         });
 
     let description = get_field_description(field);
-    let item = quote! {
+    let item = quote_spanned! { field.span() =>
         #group
         #subgroup
-        ::godot_rust_script::private_export::RustScriptPropDesc {
-            name: #name,
+        builder.add_property(::godot_rust_script::private_export::RustScriptPropDesc {
+            name: #name.into(),
             ty: #ty,
             class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
             usage: #usage,
             hint: #hint,
             hint_string: #hint_string,
             description: concat!(#description),
-        },
+        });
     };
 
     Ok(item)
@@ -523,11 +573,11 @@ fn derive_signal_metadata(field: &SpannedValue<FieldOpts>) -> (TokenStream, Toke
         .unwrap_or_else(|| quote!(None));
 
     let metadata = quote! {
-        ::godot_rust_script::private_export::RustScriptSignalDesc {
+        builder.add_signal(::godot_rust_script::private_export::RustScriptSignalDesc {
             name: #signal_name,
             arguments: <#signal_type>::argument_desc(#argument_names),
             description: concat!(#signal_description),
-        },
+        });
     };
 
     (metadata, const_assert.unwrap_or_default())
@@ -551,15 +601,15 @@ fn derive_export_group(
             let group_name = group.name;
 
             Ok(quote_spanned! { first_attr.span() =>
-                ::godot_rust_script::private_export::RustScriptPropDesc {
-                    name: #group_name,
+                builder.add_property(::godot_rust_script::private_export::RustScriptPropDesc {
+                    name: #group_name.into(),
                     ty: #godot_types::sys::VariantType::NIL,
                     class_name: #godot_types::meta::ClassId::none(),
                     usage: #property_usage_ty::GROUP,
                     hint: #property_hint_ty::NONE,
                     hint_string: String::new(),
                     description: "",
-                },
+                });
             })
         })
 }
@@ -582,15 +632,15 @@ fn derive_export_subgroup(
             let group_name = group.name;
 
             Ok(quote_spanned! { first_attr.span() =>
-                ::godot_rust_script::private_export::RustScriptPropDesc {
-                    name: #group_name,
+                builder.add_property(::godot_rust_script::private_export::RustScriptPropDesc {
+                    name: #group_name.into(),
                     ty: #godot_types::sys::VariantType::NIL,
                     class_name: #godot_types::meta::ClassId::none(),
                     usage: #property_usage_ty::SUBGROUP,
                     hint: #property_hint_ty::NONE,
                     hint_string: String::new(),
                     description: "",
-                },
+                });
             })
         })
 }

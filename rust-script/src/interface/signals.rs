@@ -110,7 +110,7 @@ macro_rules! single_args {
 macro_rules! signal_argument_desc {
     ($name:expr, $type:ty) => {
         RustScriptPropDesc {
-            name: $name,
+            name: std::borrow::Cow::Borrowed($name),
             ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::VARIANT_TYPE.variant_as_nil(),
             class_name: <<$type as GodotConvert>::Via as GodotType>::class_id(),
             usage: PropertyUsageFlags::NONE,

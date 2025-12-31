@@ -36,9 +36,14 @@ pub struct FieldExportOps {
     custom: Option<WithOriginal<ExportCustomOps, Meta>>,
     #[darling(rename = "ty")]
     custom_type: Option<WithOriginal<LitStr, Meta>>,
+    flatten: Option<()>,
 }
 
 impl FieldExportOps {
+    pub fn is_flatten(&self) -> bool {
+        self.flatten.is_some()
+    }
+
     pub fn to_export_meta(&self, ty: &Type, span: Span) -> Result<ExportMetadata, TokenStream> {
         let godot_types = godot_types();
         let property_hints = quote!(#godot_types::global::PropertyHint);

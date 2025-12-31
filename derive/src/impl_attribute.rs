@@ -5,10 +5,10 @@
  */
 
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    parse2, parse_macro_input, spanned::Spanned, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl,
-    PatIdent, PatType, ReturnType, Token, Type, Visibility,
+    FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, PatIdent, PatType, ReturnType, Token, Type,
+    Visibility, parse_macro_input, parse2, spanned::Spanned,
 };
 
 use crate::{
@@ -71,7 +71,7 @@ pub fn godot_script_impl(
                             quote_spanned! {
                                 arg.span() =>
                                 ::godot_rust_script::private_export::RustScriptPropDesc {
-                                    name: stringify!(#arg_name),
+                                    name: stringify!(#arg_name).into(),
                                     ty: #arg_type,
                                     class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
                                     usage: #godot_types::global::PropertyUsageFlags::NONE,
@@ -133,7 +133,7 @@ pub fn godot_script_impl(
                         #fn_name_str,
                         Box::new([#args_meta]),
                         ::godot_rust_script::private_export::RustScriptPropDesc {
-                            name: #fn_name_str,
+                            name: #fn_name_str.into(),
                             ty: #fn_return_ty,
                             class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
                             usage: #godot_types::global::PropertyUsageFlags::NONE,

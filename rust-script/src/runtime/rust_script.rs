@@ -7,16 +7,16 @@
 use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
 use godot::classes::{
-    notify::ObjectNotification, object::ConnectFlags, ClassDb, Engine, IScriptExtension, Object,
-    Script, ScriptExtension, ScriptLanguage,
+    ClassDb, Engine, IScriptExtension, Object, Script, ScriptExtension, ScriptLanguage,
+    notify::ObjectNotification, object::ConnectFlags,
 };
-use godot::global::{godot_error, godot_print, godot_warn, PropertyUsageFlags};
+use godot::global::{PropertyUsageFlags, godot_error, godot_print, godot_warn};
 use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::script::create_script_instance;
 use godot::obj::{EngineBitfield, InstanceId, Singleton as _, WithBaseField};
 use godot::prelude::{
-    godot_api, Array, Base, Callable, GString, Gd, GodotClass, StringName, VarArray, VarDictionary,
-    Variant,
+    Array, Base, Callable, GString, Gd, GodotClass, StringName, VarArray, VarDictionary, Variant,
+    godot_api,
 };
 
 use crate::apply::Apply;
@@ -24,11 +24,11 @@ use crate::private_export::RustScriptPropDesc;
 
 use super::rust_script_instance::GodotScriptObject;
 use super::{
+    SCRIPT_REGISTRY,
     downgrade_self::DowngradeSelf,
     metadata::{Documented, ToDictionary, ToMethodDoc, ToPropertyDoc},
     rust_script_instance::{RustScriptInstance, RustScriptPlaceholder},
     rust_script_language::RustScriptLanguage,
-    SCRIPT_REGISTRY,
 };
 
 const NOTIFICATION_EXTENSION_RELOADED: i32 = 2;
@@ -414,7 +414,7 @@ impl IScriptExtension for RustScript {
             self.map_property_info_list(|prop| {
                 (prop.usage.ord() & PropertyUsageFlags::EDITOR.ord()
                     != PropertyUsageFlags::NONE.ord())
-                .then_some(prop.name)
+                .then_some(prop.name.clone())
             })
         } else {
             Vec::with_capacity(0)
@@ -434,9 +434,9 @@ impl IScriptExtension for RustScript {
                     .iter()
                     .flatten()
                     .map(|key| {
-                        let value = object.get(*key);
+                        let value = object.get(key.as_ref());
 
-                        (*key, value)
+                        (key.as_ref(), value)
                     })
                     .collect()
             } else {
@@ -513,7 +513,7 @@ impl IScriptExtension for RustScript {
                 class
                     .properties()
                     .iter()
-                    .map(|prop| StringName::from(prop.name))
+                    .map(|prop| StringName::from(prop.name.as_ref()))
                     .collect()
             })
             .unwrap_or_default()

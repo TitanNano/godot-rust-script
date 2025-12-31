@@ -4,13 +4,18 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use godot::builtin::{Array, GString};
+use std::collections::HashMap;
+
+use godot::builtin::{Array, GString, StringName, Variant};
 use godot::classes::{Node, Node3D};
-use godot::global::PropertyHint;
+use godot::global::{PropertyHint, PropertyUsageFlags};
+use godot::meta::{FromGodot, GodotType, ToGodot};
 use godot::obj::{Gd, NewAlloc};
+use godot::sys::GodotFfi;
+use godot_rust_script::private_export::RustScriptPropDesc;
 use godot_rust_script::{
-    godot_script_impl, CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef,
-    ScriptSignal,
+    CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, PropertyGroupBuilder, RsRef,
+    ScriptPropertyGroup, ScriptSignal, SetScriptProperty, godot_script_impl,
 };
 
 #[derive(Debug, Default, GodotScriptEnum)]
@@ -70,7 +75,82 @@ struct TestScript {
     #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
     pub script_ref: OnEditor<RsRef<TestScript>>,
 
+    #[export(flatten)]
+    pub property_group: Option<PropertyGroup>,
+
     base: Gd<<Self as GodotScript>::Base>,
+}
+
+#[derive(Debug, Default)]
+struct PropertyGroup {
+    item1: u32,
+    item2: GString,
+    item3: OnEditor<Gd<Node3D>>,
+}
+
+impl ScriptPropertyGroup for PropertyGroup {
+    const NAME: &'static str = "Property Group";
+
+    fn get_property(&self, name: &str) -> godot::builtin::Variant {
+        match name {
+            "item1" => self.item1.to_variant(),
+            "item2" => self.item2.to_variant(),
+            "item3" => self.item3.to_variant(),
+            _ => Variant::nil(),
+        }
+    }
+
+    fn set_property(&mut self, name: &str, value: godot::builtin::Variant) {
+        match name {
+            "item1" => self.item1 = FromGodot::try_from_variant(&value).unwrap(),
+            "item2" => self.item2 = FromGodot::try_from_variant(&value).unwrap(),
+            "item3" => self
+                .item3
+                .set_property(FromGodot::try_from_variant(&value).unwrap()),
+            _ => (),
+        }
+    }
+
+    fn properties() -> PropertyGroupBuilder {
+        PropertyGroupBuilder::new(Self::NAME, 2)
+            .add_property(RustScriptPropDesc {
+                class_name: <u32 as GodotType>::class_id(),
+                name: "item1".into(),
+                ty: <<u32 as GodotType>::Ffi as GodotFfi>::VARIANT_TYPE.variant_as_nil(),
+                hint: PropertyHint::NONE,
+                usage: PropertyUsageFlags::SCRIPT_VARIABLE
+                    | PropertyUsageFlags::EDITOR
+                    | PropertyUsageFlags::STORAGE,
+                hint_string: String::new(),
+                description: "",
+            })
+            .add_property(RustScriptPropDesc {
+                class_name: <GString as GodotType>::class_id(),
+                name: "item2".into(),
+                ty: <<GString as GodotType>::Ffi as GodotFfi>::VARIANT_TYPE.variant_as_nil(),
+                hint: PropertyHint::NONE,
+                usage: PropertyUsageFlags::SCRIPT_VARIABLE
+                    | PropertyUsageFlags::EDITOR
+                    | PropertyUsageFlags::STORAGE,
+                hint_string: String::new(),
+                description: "",
+            })
+    }
+
+    fn export_property_states(
+        &self,
+        prefix: &'static str,
+        state: &mut HashMap<StringName, godot::builtin::Variant>,
+    ) {
+        state.insert(
+            format!("{}_item1", prefix).as_str().into(),
+            self.item1.to_variant(),
+        );
+        state.insert(
+            format!("{}_item2", prefix).as_str().into(),
+            self.item2.to_variant(),
+        );
+    }
 }
 
 #[godot_script_impl]
