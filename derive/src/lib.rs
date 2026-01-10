@@ -7,6 +7,7 @@
 mod attribute_ops;
 mod enums;
 mod impl_attribute;
+mod property_group;
 mod type_paths;
 
 use darling::{FromAttributes, FromDeriveInput, FromMeta, util::SpannedValue};
@@ -204,7 +205,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     output.into()
 }
 
-fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
+pub(crate) fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
     use syn::Type as T;
 
     let godot_types = godot_types();
@@ -690,4 +691,16 @@ fn extract_ident_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream
 #[proc_macro_derive(GodotScriptEnum, attributes(script_enum))]
 pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     enums::script_enum_derive(input)
+}
+
+/// Derive an implementation of [`ScriptPropertyGroup`](godot_rust_script::ScriptPropertyGroup).
+///
+/// Automatically generate an implementation of the `ScriptPropertyGroup` trait. The export attributes of the [`GodotScript`] derive macro
+/// are supported here as well. See the other derive macro for details.
+#[proc_macro_derive(
+    ScriptPropertyGroup,
+    attributes(export, export_group, export_subgroup, script, prop, signal)
+)]
+pub fn derive_property_group(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    property_group::derive_property_group(input)
 }

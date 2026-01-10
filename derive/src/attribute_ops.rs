@@ -456,3 +456,9 @@ pub struct ExportGroup {
 pub struct ExportSubgroup {
     pub name: String,
 }
+
+#[derive(FromDeriveInput, Debug)]
+#[darling(supports(struct_any), attributes(script), forward_attrs(doc))]
+pub struct ScriptPropertyGroupOpts {
+    pub data: Data<util::Ignored, SpannedValue<FieldOpts>>,
+}

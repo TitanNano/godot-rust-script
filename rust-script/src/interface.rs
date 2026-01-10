@@ -6,6 +6,7 @@
 
 mod export;
 mod on_editor;
+mod property_group;
 mod signals;
 
 use std::marker::PhantomData;
@@ -20,8 +21,9 @@ use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 pub use crate::runtime::Context;
 use crate::runtime::RustScript;
 
-pub use export::{GodotScriptExport, PropertyGroupBuilder, ScriptPropertyGroup};
+pub use export::GodotScriptExport;
 pub use on_editor::OnEditor;
+pub use property_group::{PropertyGroupBuilder, ScriptPropertyGroup};
 #[expect(deprecated)]
 pub use signals::{ScriptSignal, Signal};
 
