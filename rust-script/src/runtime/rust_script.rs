@@ -7,16 +7,16 @@
 use std::{cell::RefCell, collections::HashSet, ffi::c_void};
 
 use godot::classes::{
-    notify::ObjectNotification, object::ConnectFlags, ClassDb, Engine, IScriptExtension, Object,
-    Script, ScriptExtension, ScriptLanguage,
+    ClassDb, Engine, IScriptExtension, Object, Script, ScriptExtension, ScriptLanguage,
+    notify::ObjectNotification, object::ConnectFlags,
 };
-use godot::global::{godot_error, godot_print, godot_warn, PropertyUsageFlags};
+use godot::global::{PropertyUsageFlags, godot_error, godot_print, godot_warn};
 use godot::meta::{MethodInfo, PropertyInfo, ToGodot};
 use godot::obj::script::create_script_instance;
 use godot::obj::{EngineBitfield, InstanceId, Singleton as _, WithBaseField};
 use godot::prelude::{
-    godot_api, Array, Base, Callable, GString, Gd, GodotClass, StringName, VarArray, VarDictionary,
-    Variant,
+    Array, Base, Callable, GString, Gd, GodotClass, StringName, VarArray, VarDictionary, Variant,
+    godot_api,
 };
 
 use crate::apply::Apply;
@@ -24,11 +24,11 @@ use crate::private_export::RustScriptPropDesc;
 
 use super::rust_script_instance::GodotScriptObject;
 use super::{
+    SCRIPT_REGISTRY,
     downgrade_self::DowngradeSelf,
     metadata::{Documented, ToDictionary, ToMethodDoc, ToPropertyDoc},
     rust_script_instance::{RustScriptInstance, RustScriptPlaceholder},
     rust_script_language::RustScriptLanguage,
-    SCRIPT_REGISTRY,
 };
 
 const NOTIFICATION_EXTENSION_RELOADED: i32 = 2;
@@ -212,7 +212,8 @@ impl IScriptExtension for RustScript {
             ConnectFlags::ONE_SHOT,
         );
 
-        create_script_instance(instance, for_object)
+        // SAFETY: we are not freeing the owner object before we pass the script instance pointer back to the engine.
+        unsafe { create_script_instance(instance, for_object) }
     }
 
     unsafe fn placeholder_instance_create_rawptr(&self, for_object: Gd<Object>) -> *mut c_void {
@@ -220,7 +221,8 @@ impl IScriptExtension for RustScript {
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
-        create_script_instance(placeholder, for_object)
+        // SAFETY: we are not freeing the owner object before we pass the script instance pointer back to the engine.
+        unsafe { create_script_instance(placeholder, for_object) }
     }
 
     fn is_valid(&self) -> bool {
@@ -447,7 +449,7 @@ impl IScriptExtension for RustScript {
             object.set_script(Option::<&Gd<Script>>::None);
 
             self.downgrade_gd(|self_gd| {
-                // re-assign script to create new instance.
+                // Reassign script to create new instance.
                 object.set_script(Some(&self_gd));
 
                 if keep_state {
@@ -497,7 +499,7 @@ impl IScriptExtension for RustScript {
 
     #[cfg(since_api = "4.2")]
     fn has_static_method(&self, #[expect(unused)] method: StringName) -> bool {
-        // static methods are currently not supported
+        // Static methods are currently not supported
         false
     }
 

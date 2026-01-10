@@ -267,9 +267,9 @@ where
 #[macro_export]
 macro_rules! define_script_root {
     () => {
-        #[no_mangle]
-        pub fn __godot_rust_script_init(
-        ) -> ::std::vec::Vec<$crate::private_export::RustScriptMetaData> {
+        #[unsafe(no_mangle)]
+        pub fn __godot_rust_script_init()
+        -> ::std::vec::Vec<$crate::private_export::RustScriptMetaData> {
             use $crate::godot::obj::EngineEnum;
             use $crate::private_export::*;
 
