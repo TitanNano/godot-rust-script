@@ -14,16 +14,16 @@ use godot::obj::script::{ScriptInstance, SiMut};
 use godot::prelude::{GString, Gd, Object, StringName, Variant, VariantType};
 use godot_cell::blocking::GdCell;
 
-use super::call_context::GenericContext;
 use super::Context;
-use super::{rust_script::RustScript, rust_script_language::RustScriptLanguage, SCRIPT_REGISTRY};
+use super::call_context::GenericContext;
+use super::{SCRIPT_REGISTRY, rust_script::RustScript, rust_script_language::RustScriptLanguage};
 use crate::GodotScript;
 
 fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
-    let methods = SCRIPT_REGISTRY
+    SCRIPT_REGISTRY
         .read()
         .expect("script registry is inaccessible")
         .get(&class_name)
@@ -34,9 +34,7 @@ fn script_method_list(script: &Gd<RustScript>) -> Box<[MethodInfo]> {
                 .map(MethodInfo::from)
                 .collect()
         })
-        .unwrap_or_else(|| Box::new([]) as Box<[MethodInfo]>);
-
-    methods
+        .unwrap_or_else(|| Box::new([]) as Box<[MethodInfo]>)
 }
 
 fn script_class_name(script: &Gd<RustScript>) -> GString {
@@ -47,14 +45,12 @@ fn script_property_list(script: &Gd<RustScript>) -> Box<[PropertyInfo]> {
     let rs = script.bind();
     let class_name = rs.str_class_name();
 
-    let props = SCRIPT_REGISTRY
+    SCRIPT_REGISTRY
         .read()
         .expect("script registry is inaccessible")
         .get(&class_name)
         .map(|meta| meta.properties().iter().map(PropertyInfo::from).collect())
-        .unwrap_or_else(|| Box::new([]) as Box<[PropertyInfo]>);
-
-    props
+        .unwrap_or_else(|| Box::new([]) as Box<[PropertyInfo]>)
 }
 
 pub trait GodotScriptObject {
@@ -181,7 +177,7 @@ impl ScriptInstance for RustScriptInstance {
 
         let base = this.base_mut();
 
-        // SAFETY: cell pointer was just created and is valid. It will not out-live the current function.
+        // SAFETY: cell pointer was just created and is valid. It will not outlive the current function.
         let mut data_guard = match unsafe { &*cell }.borrow_mut() {
             Ok(guard) => guard,
             Err(err) => {
@@ -198,7 +194,7 @@ impl ScriptInstance for RustScriptInstance {
         let data = data_guard.deref_mut();
         let data_ptr = data as *mut _;
 
-        // SAFETY: cell & data_ptr are valid for the duration of the call. The context can not out-live the current function as it's tied
+        // SAFETY: cell & data_ptr are valid for the duration of the call. The context can not outlive the current function as it's tied
         // to the lifetime of the base ref.
         let context = unsafe { GenericContext::new(cell, data_ptr, base) };
 
@@ -228,7 +224,6 @@ impl ScriptInstance for RustScriptInstance {
     }
 
     fn to_string(&self) -> GString {
-        // self.data.to_string().into()
         GString::new()
     }
 
