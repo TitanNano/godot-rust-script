@@ -9,3 +9,6 @@ crate-type = ["cdylib"]
 [dependencies]
 godot-rust-script = { path = "../rust-script" }
 godot.workspace = true
+
+[build-dependencies]
+godot-bindings.workspace = true

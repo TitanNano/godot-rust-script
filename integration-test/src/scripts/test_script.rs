@@ -73,8 +73,13 @@ struct TestScript {
     #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
     pub script_ref: OnEditor<RsRef<TestScript>>,
 
+    #[cfg(since_api = "4.5")]
     #[export(flatten)]
     pub property_group: Option<PropertyGroup>,
+
+    #[cfg(before_api = "4.5")]
+    #[export(flatten)]
+    pub property_group: PropertyGroup,
 
     base: Gd<<Self as GodotScript>::Base>,
 }

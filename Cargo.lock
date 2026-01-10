@@ -214,6 +214,7 @@ name = "integration-test"
 version = "0.1.0"
 dependencies = [
  "godot",
+ "godot-bindings",
  "godot-rust-script",
 ]
 
