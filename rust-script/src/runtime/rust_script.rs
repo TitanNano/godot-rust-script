@@ -212,7 +212,8 @@ impl IScriptExtension for RustScript {
             ConnectFlags::ONE_SHOT,
         );
 
-        create_script_instance(instance, for_object)
+        // SAFETY: we are not freeing the owner object before we pass the script instance pointer back to the engine.
+        unsafe { create_script_instance(instance, for_object) }
     }
 
     unsafe fn placeholder_instance_create_rawptr(&self, for_object: Gd<Object>) -> *mut c_void {
@@ -220,7 +221,8 @@ impl IScriptExtension for RustScript {
 
         let placeholder = RustScriptPlaceholder::new(self.to_gd());
 
-        create_script_instance(placeholder, for_object)
+        // SAFETY: we are not freeing the owner object before we pass the script instance pointer back to the engine.
+        unsafe { create_script_instance(placeholder, for_object) }
     }
 
     fn is_valid(&self) -> bool {
@@ -447,7 +449,7 @@ impl IScriptExtension for RustScript {
             object.set_script(Option::<&Gd<Script>>::None);
 
             self.downgrade_gd(|self_gd| {
-                // re-assign script to create new instance.
+                // Reassign script to create new instance.
                 object.set_script(Some(&self_gd));
 
                 if keep_state {
@@ -497,7 +499,7 @@ impl IScriptExtension for RustScript {
 
     #[cfg(since_api = "4.2")]
     fn has_static_method(&self, #[expect(unused)] method: StringName) -> bool {
-        // static methods are currently not supported
+        // Static methods are currently not supported
         false
     }
 
