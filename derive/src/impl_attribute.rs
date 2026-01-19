@@ -45,7 +45,7 @@ pub fn godot_script_impl(
                 ty @ ReturnType::Default => syn::parse2::<Type>(quote_spanned!(ty.span() => ())).map_err(|err| err.into_compile_error())?,
                 ReturnType::Type(_, ty) => (**ty).to_owned(),
             };
-            let fn_return_ty = rust_to_variant_type(&fn_return_ty_rust)?;
+            let fn_return_ty = rust_to_variant_type(&fn_return_ty_rust).map_err(|err| err.write_errors())?;
             let is_static = !fnc.sig.inputs.iter().any(|arg| matches!(arg, FnArg::Receiver(_)));
 
             let args: Vec<(TokenStream, TokenStream)> = fnc.sig.inputs

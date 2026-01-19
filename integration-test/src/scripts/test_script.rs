@@ -8,12 +8,12 @@ use std::collections::HashMap;
 
 use godot::builtin::{Array, GString, StringName, Variant};
 use godot::classes::{Node, Node3D};
-use godot::global::{PropertyHint, PropertyUsageFlags};
+use godot::global::PropertyHint;
 use godot::meta::{FromGodot, ToGodot};
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{
     CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef, ScriptPropertyGroup,
-    ScriptSignal, godot_script_impl,
+    ScriptPropertySubgroup, ScriptSignal, godot_script_impl,
 };
 
 #[derive(Debug, Default, GodotScriptEnum)]
@@ -87,8 +87,14 @@ struct TestScript {
 #[derive(Debug, Default, ScriptPropertyGroup)]
 struct PropertyGroup {
     item1: u32,
-    item2: GString,
+    #[export(flatten)]
+    item2: PropertySubgroup,
     item3: OnEditor<Gd<Node3D>>,
+}
+
+#[derive(ScriptPropertySubgroup, Default, Debug)]
+struct PropertySubgroup {
+    subitem: f32,
 }
 
 #[godot_script_impl]

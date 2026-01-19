@@ -12,15 +12,89 @@ use godot::meta::ClassId;
 
 use crate::private_export::RustScriptPropDesc;
 
+enum PropertyGroupItem {
+    Prop(RustScriptPropDesc),
+    Sub {
+        name: &'static str,
+        description: &'static str,
+        builder: PropertySubgroupBuilder,
+    },
+}
+
 /// Build metadata for script property groups.
 ///
 /// The builder allows assembling a group of script properties in multiple steps.
 pub struct PropertyGroupBuilder {
     name: &'static str,
-    properties: Vec<RustScriptPropDesc>,
+    properties: Vec<PropertyGroupItem>,
 }
 
 impl PropertyGroupBuilder {
+    pub fn new(name: &'static str, capacity: usize) -> Self {
+        Self {
+            name,
+            properties: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub fn add_property(mut self, property_desc: RustScriptPropDesc) -> Self {
+        self.properties.push(PropertyGroupItem::Prop(property_desc));
+        self
+    }
+
+    pub fn add_subgroup(
+        mut self,
+        name: &'static str,
+        description: &'static str,
+        subgroup: PropertySubgroupBuilder,
+    ) -> Self {
+        self.properties.push(PropertyGroupItem::Sub {
+            name,
+            description,
+            builder: subgroup,
+        });
+        self
+    }
+
+    pub fn build(self, prefix: &str, description: &'static str) -> Box<[RustScriptPropDesc]> {
+        [RustScriptPropDesc {
+            name: self.name.into(),
+            ty: VariantType::NIL,
+            class_name: ClassId::none(),
+            usage: PropertyUsageFlags::GROUP,
+            hint: PropertyHint::NONE,
+            hint_string: prefix.into(),
+            description,
+        }]
+        .into_iter()
+        .chain(self.properties.into_iter().flat_map(|item| {
+            match item {
+                PropertyGroupItem::Prop(mut prop_desc) => {
+                    prop_desc.name = format!("{prefix}{}", prop_desc.name).into();
+                    vec![prop_desc].into_iter()
+                }
+                PropertyGroupItem::Sub {
+                    name,
+                    description,
+                    builder,
+                } => builder
+                    .build(&format!("{prefix}{name}_"), description)
+                    .into_iter(),
+            }
+        }))
+        .collect()
+    }
+}
+
+/// Build metadata for script property subgroups.
+///
+/// The builder allows assembling a subgroup of script properties in multiple steps.
+pub struct PropertySubgroupBuilder {
+    name: &'static str,
+    properties: Vec<RustScriptPropDesc>,
+}
+
+impl PropertySubgroupBuilder {
     pub fn new(name: &'static str, capacity: usize) -> Self {
         Self {
             name,
@@ -38,7 +112,7 @@ impl PropertyGroupBuilder {
             name: self.name.into(),
             ty: VariantType::NIL,
             class_name: ClassId::none(),
-            usage: PropertyUsageFlags::GROUP,
+            usage: PropertyUsageFlags::SUBGROUP,
             hint: PropertyHint::NONE,
             hint_string: prefix.into(),
             description,
@@ -61,6 +135,23 @@ pub trait ScriptPropertyGroup {
     fn get_property(&self, name: &str) -> godot::builtin::Variant;
     fn set_property(&mut self, name: &str, value: godot::builtin::Variant);
     fn properties() -> PropertyGroupBuilder;
+    fn export_property_states(
+        &self,
+        prefix: &'static str,
+        state: &mut HashMap<StringName, godot::builtin::Variant>,
+    );
+}
+
+/// A subgroup of properties that can are exported by a script.
+///
+// Script property groups can be nested at most two levels deep. This means subgroups can be flattened into groups, but subgroups can not
+// be nested further.
+pub trait ScriptPropertySubgroup {
+    const NAME: &'static str;
+
+    fn get_property(&self, name: &str) -> godot::builtin::Variant;
+    fn set_property(&mut self, name: &str, value: godot::builtin::Variant);
+    fn properties() -> PropertySubgroupBuilder;
     fn export_property_states(
         &self,
         prefix: &'static str,

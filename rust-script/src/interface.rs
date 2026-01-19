@@ -23,7 +23,9 @@ use crate::runtime::RustScript;
 
 pub use export::GodotScriptExport;
 pub use on_editor::OnEditor;
-pub use property_group::{PropertyGroupBuilder, ScriptPropertyGroup};
+pub use property_group::{
+    PropertyGroupBuilder, PropertySubgroupBuilder, ScriptPropertyGroup, ScriptPropertySubgroup,
+};
 #[expect(deprecated)]
 pub use signals::{ScriptSignal, Signal};
 

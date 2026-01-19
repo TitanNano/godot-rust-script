@@ -12,7 +12,7 @@ mod type_paths;
 
 use darling::{FromAttributes, FromDeriveInput, FromMeta, util::SpannedValue};
 use itertools::Itertools;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{DeriveInput, Ident, Type, parse_macro_input, spanned::Spanned};
 
@@ -205,7 +205,7 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     output.into()
 }
 
-pub(crate) fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenStream> {
+pub(crate) fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, darling::Error> {
     use syn::Type as T;
 
     let godot_types = godot_types();
@@ -219,18 +219,17 @@ pub(crate) fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenS
                 <<#path as #godot_types::meta::GodotConvert>::Via as GodotType>::Ffi::VARIANT_TYPE.variant_as_nil()
             }
         }),
-        T::Verbatim(_) => Err(syn::Error::new(
-            ty.span(),
-            "not sure how to handle verbatim types yet!",
-        )
-        .into_compile_error()),
+        T::Verbatim(_) => Err(
+            darling::Error::custom("not sure how to handle verbatim types yet!")
+                .with_span(&ty.span()),
+        ),
         T::Tuple(tuple) => {
             if !tuple.elems.is_empty() {
-                return Err(syn::Error::new(
-                    ty.span(),
-                    format!("\"{}\" is not a supported type", quote!(#tuple)),
-                )
-                .into_compile_error());
+                return Err(darling::Error::custom(format!(
+                    "\"{}\" is not a supported type",
+                    quote!(#tuple)
+                ))
+                .with_span(&ty.span()));
             }
 
             Ok(quote_spanned! {
@@ -242,11 +241,10 @@ pub(crate) fn rust_to_variant_type(ty: &syn::Type) -> Result<TokenStream, TokenS
                 }
             })
         }
-        _ => Err(syn::Error::new(
-            ty.span(),
-            format!("\"{}\" is not a supported type", quote!(#ty)),
-        )
-        .into_compile_error()),
+        _ => Err(
+            darling::Error::custom(format!("\"{}\" is not a supported type", quote!(#ty)))
+                .with_span(&ty.span()),
+        ),
     }
 }
 
@@ -448,7 +446,7 @@ fn derive_field_metadata(
         .unwrap_or_default();
 
     let rust_ty = &field.ty;
-    let ty = rust_to_variant_type(&field.ty)?;
+    let ty = rust_to_variant_type(&field.ty).map_err(|err| err.write_errors())?;
     let group = derive_export_group(field).transpose()?;
     let subgroup = derive_export_subgroup(field).transpose()?;
 
@@ -476,7 +474,8 @@ fn derive_field_metadata(
 
             ops.to_export_meta(&field.ty, span)
         })
-        .transpose()?
+        .transpose()
+        .map_err(|err| err.write_errors())?
         .unwrap_or_else(|| ExportMetadata {
             field: "",
             usage: quote_spanned!(field.span() => #property_usage_ty::SCRIPT_VARIABLE),
@@ -702,5 +701,25 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     attributes(export, export_group, export_subgroup, script, prop, signal)
 )]
 pub fn derive_property_group(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    property_group::derive_property_group(input)
+    property_group::derive_property_group(
+        Ident::new("ScriptPropertyGroup", Span::call_site()),
+        input,
+        true,
+    )
+}
+
+/// Derive an implementation of [`ScriptPropertySubgroup`](godot_rust_script::ScriptPropertyGroup).
+///
+/// Automatically generate an implementation of the `ScriptPropertySubgroup` trait. The export attributes of the [`GodotScript`] derive macro
+/// are supported here as well. See the other derive macro for details.
+#[proc_macro_derive(
+    ScriptPropertySubgroup,
+    attributes(export, export_group, export_subgroup, script, prop, signal)
+)]
+pub fn derive_property_subgroup(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
+    property_group::derive_property_group(
+        Ident::new("ScriptPropertySubgroup", Span::call_site()),
+        input,
+        false,
+    )
 }

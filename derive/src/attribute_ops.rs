@@ -36,7 +36,7 @@ pub struct FieldExportOps {
     custom: Option<WithOriginal<ExportCustomOps, Meta>>,
     #[darling(rename = "ty")]
     custom_type: Option<WithOriginal<LitStr, Meta>>,
-    flatten: Option<()>,
+    flatten: Option<WithOriginal<(), Meta>>,
 }
 
 impl FieldExportOps {
@@ -44,7 +44,11 @@ impl FieldExportOps {
         self.flatten.is_some()
     }
 
-    pub fn to_export_meta(&self, ty: &Type, span: Span) -> Result<ExportMetadata, TokenStream> {
+    pub fn flatten_span(&self) -> Option<Span> {
+        self.flatten.as_ref().map(|flatten| flatten.original.span())
+    }
+
+    pub fn to_export_meta(&self, ty: &Type, span: Span) -> Result<ExportMetadata, darling::Error> {
         let godot_types = godot_types();
         let property_hints = quote!(#godot_types::global::PropertyHint);
         let property_usage = quote!(#godot_types::global::PropertyUsageFlags);
@@ -88,8 +92,7 @@ impl FieldExportOps {
                 .elems
                 .iter()
                 .map(ExpEasingOpts::from_expr)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?;
+                .collect::<Result<Vec<_>, _>>()?;
 
             let serialized_params = parsed_params
                 .into_iter()
@@ -120,8 +123,7 @@ impl FieldExportOps {
                 .elems
                 .iter()
                 .map(String::from_expr)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?
+                .collect::<Result<Vec<_>, _>>()?
                 .join(",");
 
             result = Some(ExportMetadata {
@@ -144,8 +146,7 @@ impl FieldExportOps {
                 .elems
                 .iter()
                 .map(String::from_expr)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?
+                .collect::<Result<Vec<_>, _>>()?
                 .join(",");
 
             result = Some(ExportMetadata {
@@ -168,8 +169,7 @@ impl FieldExportOps {
                 .elems
                 .iter()
                 .map(String::from_expr)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?
+                .collect::<Result<Vec<_>, _>>()?
                 .join(",");
 
             result = Some(ExportMetadata {
@@ -237,8 +237,7 @@ impl FieldExportOps {
                 .elems
                 .iter()
                 .map(String::from_expr)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|err| err.write_errors())?
+                .collect::<Result<Vec<_>, _>>()?
                 .join(",");
 
             result = Some(ExportMetadata {
@@ -318,11 +317,8 @@ impl FieldExportOps {
             }
 
             if !attr_storage.parsed {
-                let err = syn::Error::new_spanned(
-                    &attr_storage.original,
-                    "storage can not be set to false",
-                )
-                .into_compile_error();
+                let err = darling::Error::custom("storage can not be set to false")
+                    .with_span(&attr_storage.original);
 
                 return Err(err);
             }
@@ -381,12 +377,14 @@ impl FieldExportOps {
         })
     }
 
-    fn error(span: Span, active_field: &str, field: &str) -> Result<ExportMetadata, TokenStream> {
-        let err = syn::Error::new(
-            span,
-            format!("{} is not compatible with {}", field, active_field),
-        )
-        .into_compile_error();
+    fn error(
+        span: Span,
+        active_field: &str,
+        field: &str,
+    ) -> Result<ExportMetadata, darling::Error> {
+        let err =
+            darling::Error::custom(format!("{} is not compatible with {}", field, active_field))
+                .with_span(&span);
 
         Err(err)
     }
@@ -460,5 +458,6 @@ pub struct ExportSubgroup {
 #[derive(FromDeriveInput, Debug)]
 #[darling(supports(struct_any), attributes(script), forward_attrs(doc))]
 pub struct ScriptPropertyGroupOpts {
+    pub ident: syn::Ident,
     pub data: Data<util::Ignored, SpannedValue<FieldOpts>>,
 }
