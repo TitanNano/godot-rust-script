@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use godot::builtin::{Array, GString, StringName, Variant};
+use godot::builtin::{Array, GString, StringName};
 use godot::classes::{Node, Node3D};
 use godot::global::PropertyHint;
 use godot::meta::{FromGodot, ToGodot};

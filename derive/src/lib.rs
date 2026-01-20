@@ -20,6 +20,9 @@ use crate::attribute_ops::{
     ExportGroup, ExportMetadata, ExportSubgroup, FieldExportOps, FieldOpts, FieldSignalOps,
     GodotScriptOpts, PropertyOpts,
 };
+use crate::property_group::{
+    dispatch_property_group_get, dispatch_property_group_set, dispatch_property_group_state_export,
+};
 use crate::type_paths::{godot_types, property_hints, property_usage, string_name_ty, variant_ty};
 
 #[proc_macro_derive(
@@ -299,14 +302,11 @@ fn derive_get_field_dispatch(field: &SpannedValue<FieldOpts>, is_flatten: bool) 
     };
 
     if is_flatten {
-        return quote_spanned! { field.ty.span() =>
-            field_name if field_name.starts_with(concat!(#field_name, "_")) => Some(
-                ::godot_rust_script::ScriptPropertyGroup::get_property(
-                    &self.#field_ident,
-                    field_name.strip_prefix(concat!(#field_name, "_")).unwrap(),
-                )
-            ),
-        };
+        return dispatch_property_group_get(
+            property_group::PropertyGroupType::Group,
+            field_ident,
+            &field.ty,
+        );
     }
 
     let accessor = match opts.get {
@@ -347,16 +347,11 @@ fn derive_set_field_dispatch(field: &SpannedValue<FieldOpts>, is_flatten: bool) 
     };
 
     if is_flatten {
-        return quote_spanned! { field.ty.span() =>
-            field_name if field_name.starts_with(concat!(#field_name, "_")) => {
-                ::godot_rust_script::ScriptPropertyGroup::set_property(
-                    &mut self.#field_ident,
-                    field_name.strip_prefix(concat!(#field_name, "_")).unwrap(),
-                    value,
-                );
-                true
-            }
-        };
+        return dispatch_property_group_set(
+            property_group::PropertyGroupType::Group,
+            field_ident,
+            &field.ty,
+        );
     }
 
     let variant_value = quote_spanned!(field.ty.span()=> #godot_types::prelude::FromGodot::try_from_variant(&value));
@@ -397,24 +392,14 @@ fn derive_set_fields(set_field_dispatch: TokenStream) -> TokenStream {
 }
 
 fn derive_property_state_export(field: &SpannedValue<FieldOpts>, is_flatten: bool) -> TokenStream {
-    let string_name_ty = string_name_ty();
-
-    let Some(ident) = field.ident.as_ref() else {
-        return Default::default();
-    };
-
-    let field_name = ident.to_string();
-    let field_string_name = quote!(#string_name_ty::from(#field_name));
-
     if is_flatten {
-        return quote_spanned! { field.span() =>
-            ::godot_rust_script::ScriptPropertyGroup::export_property_states(&self.#ident, #field_name, &mut state);
-        };
+        return dispatch_property_group_state_export(
+            property_group::PropertyGroupType::Group,
+            field,
+        );
     }
 
-    quote_spanned! { field.span() =>
-        state.insert(#field_string_name, self.get(#field_string_name).unwrap());
-    }
+    dispatch_property_export(field)
 }
 
 fn derive_property_states_export(fetch_property_states: TokenStream) -> TokenStream {
@@ -684,6 +669,16 @@ fn extract_ident_from_type(impl_target: &syn::Type) -> Result<Ident, TokenStream
         Type::Tuple(_) => Err(compile_error("Tuples are not supported!", impl_target)),
         Type::Verbatim(_) => Err(compile_error("Verbatim is not supported!", impl_target)),
         _ => Err(compile_error("Unsupported type!", impl_target)),
+    }
+}
+
+pub(crate) fn dispatch_property_export(field: &SpannedValue<FieldOpts>) -> TokenStream {
+    let string_name_ty = string_name_ty();
+    let field_name = field.ident.as_ref().unwrap().to_string();
+    let field_string_name = quote!(#string_name_ty::from(#field_name));
+
+    quote_spanned! { field.span() =>
+        state.insert(#field_string_name, self.get(#field_string_name).unwrap());
     }
 }
 

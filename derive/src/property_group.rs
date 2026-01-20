@@ -4,14 +4,14 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use darling::{FromAttributes, FromDeriveInput};
+use darling::{FromAttributes, FromDeriveInput, util::SpannedValue};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::{DeriveInput, parse_macro_input, spanned::Spanned};
 
 use crate::{
     FieldExportOps, FieldOpts, attribute_ops::ScriptPropertyGroupOpts, godot_types,
-    rust_to_variant_type,
+    rust_to_variant_type, string_name_ty,
 };
 
 trait FlattenTuple<F> {
@@ -49,6 +49,23 @@ macro_rules! merge_errors {
                 ).map(FlattenTuple::flatten))+;
 
             errors.finish_with(values).transpose().unwrap()
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum PropertyGroupType {
+    Group,
+    Subgroup,
+}
+
+impl PropertyGroupType {
+    fn trait_ident(self) -> syn::Ident {
+        match self {
+            PropertyGroupType::Group => syn::Ident::new("ScriptPropertyGroup", Span::call_site()),
+            PropertyGroupType::Subgroup => {
+                syn::Ident::new("ScriptPropertySubgroup", Span::call_site())
+            }
         }
     }
 }
@@ -109,8 +126,15 @@ pub fn derive_property_group(
                     return None;
                 }
             };
+            let prop_export =
+                derive_property_state_export(&field, flatten_subgroup, export_config.is_flatten());
 
-            Some(DerivedProperty { get, set, metadata })
+            Some(DerivedProperty {
+                get,
+                set,
+                metadata,
+                prop_export,
+            })
         })
         .collect();
 
@@ -119,6 +143,11 @@ pub fn derive_property_group(
     let metadata: TokenStream = fields
         .iter()
         .map(|field| &field.metadata)
+        .cloned()
+        .collect();
+    let prop_export: TokenStream = fields
+        .iter()
+        .map(|field| &field.prop_export)
         .cloned()
         .collect();
 
@@ -133,20 +162,21 @@ pub fn derive_property_group(
     quote! {
         #derive_errors
 
+        #[automatically_derived]
         impl #ident for #type_ident {
             const NAME: &'static str = "Property Group";
 
-            fn get_property(&self, name: &str) -> godot::builtin::Variant {
+            fn get_property(&self, name: &str) -> ::std::option::Option<::godot::builtin::Variant> {
                 match name {
                     #getters
-                    _ => Variant::nil(),
+                    _ => None,
                 }
             }
 
-            fn set_property(&mut self, name: &str, value: godot::builtin::Variant) {
+            fn set_property(&mut self, name: &str, value: godot::builtin::Variant) -> bool {
                 match name {
                     #setters
-                    _ => (),
+                    _ => false,
                 }
             }
 
@@ -155,20 +185,13 @@ pub fn derive_property_group(
                     #metadata
             }
 
+            #[allow(clippy::needless_borrow)]
             fn export_property_states(
                 &self,
                 prefix: &'static str,
-                state: &mut HashMap<StringName, godot::builtin::Variant>,
+                mut state: &mut HashMap<StringName, godot::builtin::Variant>,
             ) {
-                // export property states
-                // state.insert(
-                //     format!("{}_item1", prefix).as_str().into(),
-                //     self.item1.to_variant(),
-                // );
-                // state.insert(
-                //     format!("{}_item2", prefix).as_str().into(),
-                //     self.item2.to_variant(),
-                // );
+                #prop_export
             }
         }
     }
@@ -179,6 +202,7 @@ struct DerivedProperty {
     get: TokenStream,
     set: TokenStream,
     metadata: TokenStream,
+    prop_export: TokenStream,
 }
 
 fn derive_property_get(field: &FieldOpts, flatten_subgroup: bool, is_flatten: bool) -> TokenStream {
@@ -187,18 +211,12 @@ fn derive_property_get(field: &FieldOpts, flatten_subgroup: bool, is_flatten: bo
     let rust_ty = &field.ty;
 
     if flatten_subgroup && is_flatten {
-        return quote_spanned! {
-            field.ty.span() =>
-            field_name if field_name.starts_with(concat!(#field_name, "_")) => <#rust_ty as ::godot_rust_script::ScriptPropertySubgroup>::get_property(
-                &self.#field_ident,
-                field_name.trim_start_matches(concat!(#field_name, "_")),
-            ).to_variant(),
-        };
+        return dispatch_property_group_get(PropertyGroupType::Subgroup, field_ident, rust_ty);
     }
 
     quote_spanned! {
         field.ty.span() =>
-        #field_name => ::godot_rust_script::GetScriptProperty::get_property(&self.#field_ident).to_variant(),
+        #field_name => ::std::option::Option::Some(::godot_rust_script::GetScriptProperty::get_property(&self.#field_ident).to_variant()),
     }
 }
 
@@ -208,19 +226,15 @@ fn derive_property_set(field: &FieldOpts, flatten_subgroup: bool, is_flatten: bo
     let rust_ty = &field.ty;
 
     if flatten_subgroup && is_flatten {
-        return quote_spanned! {
-            field.ty.span() =>
-            field_name if field_name.starts_with(concat!(#field_name, "_")) => <#rust_ty as ::godot_rust_script::ScriptPropertySubgroup>::set_property(
-                &mut self.#field_ident,
-                field_name.trim_start_matches(concat!(#field_name, "_")),
-                FromGodot::try_from_variant(&value).unwrap()
-            ),
-        };
+        return dispatch_property_group_set(PropertyGroupType::Subgroup, field_ident, rust_ty);
     }
 
     quote_spanned! {
         field.ty.span() =>
-        #field_name => ::godot_rust_script::SetScriptProperty::set_property(&mut self.#field_ident, FromGodot::try_from_variant(&value).unwrap()),
+        #field_name => {
+            ::godot_rust_script::SetScriptProperty::set_property(&mut self.#field_ident, FromGodot::try_from_variant(&value).unwrap());
+            true
+        },
     }
 }
 
@@ -290,6 +304,74 @@ fn derive_property_metadata(
     })
 }
 
+fn derive_property_state_export(
+    field: &SpannedValue<FieldOpts>,
+    flatten_subgroup: bool,
+    is_flatten: bool,
+) -> TokenStream {
+    if flatten_subgroup && is_flatten {
+        return dispatch_property_group_state_export(PropertyGroupType::Subgroup, field);
+    }
+
+    let string_name_ty = string_name_ty();
+    let field_name = field.ident.as_ref().unwrap().to_string();
+    let field_string_name = quote!(#string_name_ty::from(#field_name));
+
+    quote_spanned! { field.span() =>
+        state.insert(#field_string_name, self.get_property(#field_name).unwrap());
+    }
+}
+
 fn export_config(field: &FieldOpts, span: Span) -> Result<FieldExportOps, darling::Error> {
     FieldExportOps::from_attributes(&field.attrs).map_err(|err| err.with_span(&span))
+}
+
+pub(crate) fn dispatch_property_group_set(
+    group_ty: PropertyGroupType,
+    field_ident: &syn::Ident,
+    field_ty: &syn::Type,
+) -> TokenStream {
+    let field_name = field_ident.to_string();
+    let trait_ident = group_ty.trait_ident();
+
+    quote_spanned! { field_ty.span() =>
+        field_name if field_name.starts_with(concat!(#field_name, "_")) => {
+            <#field_ty as ::godot_rust_script::#trait_ident>::set_property(
+                &mut self.#field_ident,
+                field_name.strip_prefix(concat!(#field_name, "_")).unwrap(),
+                value,
+            )
+        }
+    }
+}
+
+pub(crate) fn dispatch_property_group_get(
+    group_ty: PropertyGroupType,
+    field_ident: &syn::Ident,
+    field_ty: &syn::Type,
+) -> TokenStream {
+    let field_name = field_ident.to_string();
+    let trait_ident = group_ty.trait_ident();
+
+    quote_spanned! {
+        field_ty.span() =>
+        field_name if field_name.starts_with(concat!(#field_name, "_")) => <#field_ty as ::godot_rust_script::#trait_ident>::get_property(
+            &self.#field_ident,
+            field_name.trim_start_matches(concat!(#field_name, "_")),
+        ),
+    }
+}
+
+pub(crate) fn dispatch_property_group_state_export(
+    group_ty: PropertyGroupType,
+    field: &SpannedValue<FieldOpts>,
+) -> TokenStream {
+    let trait_ident = group_ty.trait_ident();
+
+    let field_ident = &field.ident.as_ref().unwrap();
+    let field_name = field_ident.to_string();
+
+    quote_spanned! { field.span() =>
+        ::godot_rust_script::#trait_ident::export_property_states(&self.#field_ident, #field_name, &mut state);
+    }
 }

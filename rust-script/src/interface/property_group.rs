@@ -132,8 +132,8 @@ impl PropertySubgroupBuilder {
 pub trait ScriptPropertyGroup {
     const NAME: &'static str;
 
-    fn get_property(&self, name: &str) -> godot::builtin::Variant;
-    fn set_property(&mut self, name: &str, value: godot::builtin::Variant);
+    fn get_property(&self, name: &str) -> Option<godot::builtin::Variant>;
+    fn set_property(&mut self, name: &str, value: godot::builtin::Variant) -> bool;
     fn properties() -> PropertyGroupBuilder;
     fn export_property_states(
         &self,
@@ -149,8 +149,8 @@ pub trait ScriptPropertyGroup {
 pub trait ScriptPropertySubgroup {
     const NAME: &'static str;
 
-    fn get_property(&self, name: &str) -> godot::builtin::Variant;
-    fn set_property(&mut self, name: &str, value: godot::builtin::Variant);
+    fn get_property(&self, name: &str) -> Option<godot::builtin::Variant>;
+    fn set_property(&mut self, name: &str, value: godot::builtin::Variant) -> bool;
     fn properties() -> PropertySubgroupBuilder;
     fn export_property_states(
         &self,
@@ -167,31 +167,33 @@ const OPTION_SCRIPT_PROPERTY_GROUP_PROP: &str = "enable";
 impl<T: ScriptPropertyGroup + Default> ScriptPropertyGroup for Option<T> {
     const NAME: &'static str = T::NAME;
 
-    fn get_property(&self, name: &str) -> godot::builtin::Variant {
+    fn get_property(&self, name: &str) -> Option<godot::builtin::Variant> {
         use godot::meta::ToGodot;
 
         if name == OPTION_SCRIPT_PROPERTY_GROUP_PROP {
-            return self.is_some().to_variant();
+            return Some(self.is_some().to_variant());
         }
 
         match self {
             Some(inner) => inner.get_property(name),
-            None => godot::builtin::Variant::nil(),
+            None => None,
         }
     }
 
-    fn set_property(&mut self, name: &str, value: godot::builtin::Variant) {
+    fn set_property(&mut self, name: &str, value: godot::builtin::Variant) -> bool {
         if name == OPTION_SCRIPT_PROPERTY_GROUP_PROP {
             if value.to::<bool>() {
                 *self = Some(Default::default());
             } else {
                 *self = None;
             }
-            return;
+            return true;
         }
 
         if let Some(inner) = self {
             inner.set_property(name, value)
+        } else {
+            false
         }
     }
 
@@ -218,7 +220,8 @@ impl<T: ScriptPropertyGroup + Default> ScriptPropertyGroup for Option<T> {
             format!("{}_{}", prefix, OPTION_SCRIPT_PROPERTY_GROUP_PROP)
                 .as_str()
                 .into(),
-            self.get_property(OPTION_SCRIPT_PROPERTY_GROUP_PROP),
+            self.get_property(OPTION_SCRIPT_PROPERTY_GROUP_PROP)
+                .unwrap_or(godot::builtin::Variant::from(false)),
         );
 
         if let Some(inner) = self.as_ref() {
