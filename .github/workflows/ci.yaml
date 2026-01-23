@@ -75,7 +75,8 @@ jobs:
     runs-on: "ubuntu-22.04"
     strategy:
       matrix:
-        api_version: ["4-2", "4-3", "4-4", "4-5", "custom"]
+        # pre-relase godot version is disabled due to breaking changes with godot-rust
+        api_version: ["4-2", "4-3", "4-4", "4-5"] # "custom"
 
     steps:
       - name: Checkout
