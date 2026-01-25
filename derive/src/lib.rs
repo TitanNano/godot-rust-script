@@ -439,7 +439,7 @@ fn derive_field_metadata(
         && export_ops.is_flatten()
     {
         return Ok(quote_spanned! { field.span() =>
-            builder.add_property_group(<#rust_ty as ::godot_rust_script::ScriptPropertyGroup>::properties().build(concat!(#name, "_"), ""));
+            builder.add_property_group(<#rust_ty as ::godot_rust_script::ScriptExportGroup>::properties().build(#name, ""));
         });
     }
 
@@ -687,33 +687,33 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     enums::script_enum_derive(input)
 }
 
-/// Derive an implementation of [`ScriptPropertyGroup`](godot_rust_script::ScriptPropertyGroup).
+/// Derive an implementation of [`ScriptExportGroup`](godot_rust_script::ScriptExportGroup).
 ///
-/// Automatically generate an implementation of the `ScriptPropertyGroup` trait. The export attributes of the [`GodotScript`] derive macro
+/// Automatically generate an implementation of the `ScriptExportGroup` trait. The export attributes of the [`GodotScript`] derive macro
 /// are supported here as well. See the other derive macro for details.
 #[proc_macro_derive(
-    ScriptPropertyGroup,
+    ScriptExportGroup,
     attributes(export, export_group, export_subgroup, script, prop, signal)
 )]
 pub fn derive_property_group(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     property_group::derive_property_group(
-        Ident::new("ScriptPropertyGroup", Span::call_site()),
+        Ident::new("ScriptExportGroup", Span::call_site()),
         input,
         true,
     )
 }
 
-/// Derive an implementation of [`ScriptPropertySubgroup`](godot_rust_script::ScriptPropertyGroup).
+/// Derive an implementation of [`ScriptExportSubgroup`](godot_rust_script::ScriptExportSubgroup).
 ///
-/// Automatically generate an implementation of the `ScriptPropertySubgroup` trait. The export attributes of the [`GodotScript`] derive macro
+/// Automatically generate an implementation of the `ScriptExportSubgroup` trait. The export attributes of the [`GodotScript`] derive macro
 /// are supported here as well. See the other derive macro for details.
 #[proc_macro_derive(
-    ScriptPropertySubgroup,
+    ScriptExportSubgroup,
     attributes(export, export_group, export_subgroup, script, prop, signal)
 )]
 pub fn derive_property_subgroup(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     property_group::derive_property_group(
-        Ident::new("ScriptPropertySubgroup", Span::call_site()),
+        Ident::new("ScriptExportSubgroup", Span::call_site()),
         input,
         false,
     )

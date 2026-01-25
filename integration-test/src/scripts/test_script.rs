@@ -4,16 +4,13 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::collections::HashMap;
-
-use godot::builtin::{Array, GString, StringName};
+use godot::builtin::{Array, GString};
 use godot::classes::{Node, Node3D};
 use godot::global::PropertyHint;
-use godot::meta::{FromGodot, ToGodot};
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{
-    CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef, ScriptPropertyGroup,
-    ScriptPropertySubgroup, ScriptSignal, godot_script_impl,
+    CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef, ScriptExportGroup,
+    ScriptExportSubgroup, ScriptSignal, godot_script_impl,
 };
 
 #[derive(Debug, Default, GodotScriptEnum)]
@@ -84,7 +81,7 @@ struct TestScript {
     base: Gd<<Self as GodotScript>::Base>,
 }
 
-#[derive(Debug, Default, ScriptPropertyGroup)]
+#[derive(Debug, Default, ScriptExportGroup)]
 struct PropertyGroup {
     item1: u32,
     #[export(flatten)]
@@ -92,7 +89,7 @@ struct PropertyGroup {
     item3: OnEditor<Gd<Node3D>>,
 }
 
-#[derive(ScriptPropertySubgroup, Default, Debug)]
+#[derive(ScriptExportSubgroup, Default, Debug)]
 struct PropertySubgroup {
     subitem: f32,
 }

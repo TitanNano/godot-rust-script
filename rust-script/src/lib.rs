@@ -12,7 +12,7 @@ mod runtime;
 mod static_script_registry;
 
 pub use godot_rust_script_derive::{
-    GodotScript, GodotScriptEnum, ScriptPropertyGroup, ScriptPropertySubgroup, godot_script_impl,
+    GodotScript, GodotScriptEnum, ScriptExportGroup, ScriptExportSubgroup, godot_script_impl,
 };
 pub use interface::*;
 pub use runtime::RustScriptExtensionLayer;

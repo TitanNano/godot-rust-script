@@ -62,9 +62,9 @@ pub(crate) enum PropertyGroupType {
 impl PropertyGroupType {
     fn trait_ident(self) -> syn::Ident {
         match self {
-            PropertyGroupType::Group => syn::Ident::new("ScriptPropertyGroup", Span::call_site()),
+            PropertyGroupType::Group => syn::Ident::new("ScriptExportGroup", Span::call_site()),
             PropertyGroupType::Subgroup => {
-                syn::Ident::new("ScriptPropertySubgroup", Span::call_site())
+                syn::Ident::new("ScriptExportSubgroup", Span::call_site())
             }
         }
     }
@@ -138,6 +138,7 @@ pub fn derive_property_group(
         })
         .collect();
 
+    let prop_count = fields.len();
     let getters: TokenStream = fields.iter().map(|field| &field.get).cloned().collect();
     let setters: TokenStream = fields.iter().map(|field| &field.set).cloned().collect();
     let metadata: TokenStream = fields
@@ -154,9 +155,9 @@ pub fn derive_property_group(
     let derive_errors = derive_errors.finish().err().map(|err| err.write_errors());
     let type_ident = &opts.ident;
     let builder = if flatten_subgroup {
-        quote!(PropertyGroupBuilder)
+        quote!(ExportGroupBuilder)
     } else {
-        quote!(PropertySubgroupBuilder)
+        quote!(ExportSubgroupBuilder)
     };
 
     quote! {
@@ -173,7 +174,7 @@ pub fn derive_property_group(
                 }
             }
 
-            fn set_property(&mut self, name: &str, value: godot::builtin::Variant) -> bool {
+            fn set_property(&mut self, name: &str, value: ::godot::builtin::Variant) -> bool {
                 match name {
                     #setters
                     _ => false,
@@ -181,7 +182,7 @@ pub fn derive_property_group(
             }
 
             fn properties() -> ::godot_rust_script::#builder {
-                ::godot_rust_script::#builder::new(Self::NAME, 2)
+                ::godot_rust_script::#builder::new(#prop_count)
                     #metadata
             }
 
@@ -189,7 +190,7 @@ pub fn derive_property_group(
             fn export_property_states(
                 &self,
                 prefix: &'static str,
-                mut state: &mut HashMap<StringName, godot::builtin::Variant>,
+                mut state: &mut ::std::collections::HashMap<::godot::builtin::StringName, ::godot::builtin::Variant>,
             ) {
                 #prop_export
             }
@@ -216,7 +217,7 @@ fn derive_property_get(field: &FieldOpts, flatten_subgroup: bool, is_flatten: bo
 
     quote_spanned! {
         field.ty.span() =>
-        #field_name => ::std::option::Option::Some(::godot_rust_script::GetScriptProperty::get_property(&self.#field_ident).to_variant()),
+        #field_name => ::std::option::Option::Some(::godot::meta::ToGodot::to_variant(&::godot_rust_script::GetScriptProperty::get_property(&self.#field_ident))),
     }
 }
 
@@ -232,7 +233,7 @@ fn derive_property_set(field: &FieldOpts, flatten_subgroup: bool, is_flatten: bo
     quote_spanned! {
         field.ty.span() =>
         #field_name => {
-            ::godot_rust_script::SetScriptProperty::set_property(&mut self.#field_ident, FromGodot::try_from_variant(&value).unwrap());
+            ::godot_rust_script::SetScriptProperty::set_property(&mut self.#field_ident, ::godot::meta::FromGodot::try_from_variant(&value).unwrap());
             true
         },
     }
@@ -281,7 +282,7 @@ fn derive_property_metadata(
             .add_subgroup(
                 #field_name,
                 "",
-                <#rust_ty as ::godot_rust_script::ScriptPropertySubgroup>::properties()
+                <#rust_ty as ::godot_rust_script::ScriptExportSubgroup>::properties()
             )
         });
     }
