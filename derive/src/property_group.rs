@@ -10,8 +10,8 @@ use quote::{quote, quote_spanned};
 use syn::{DeriveInput, parse_macro_input, spanned::Spanned};
 
 use crate::{
-    FieldExportOps, FieldOpts, attribute_ops::ScriptPropertyGroupOpts, godot_types,
-    rust_to_variant_type, string_name_ty,
+    FieldExportOps, FieldOpts, attribute_ops::ScriptPropertyGroupOpts, field_description,
+    godot_types, rust_to_variant_type, string_name_ty,
 };
 
 trait FlattenTuple<F> {
@@ -274,6 +274,7 @@ fn derive_property_metadata(
         }
     }
 
+    let description = field_description(field);
     let (field_ty, export_meta, _) = merge_errors!(field_ty, export_meta, errors.finish())?;
 
     if flatten_subgroup && export_config.is_flatten() {
@@ -281,7 +282,7 @@ fn derive_property_metadata(
             field.ty.span() =>
             .add_subgroup(
                 #field_name,
-                "",
+                #description,
                 <#rust_ty as ::godot_rust_script::ScriptExportSubgroup>::properties()
             )
         });
@@ -300,7 +301,7 @@ fn derive_property_metadata(
             hint: #hint,
             usage: #usage,
             hint_string: #hint_string,
-            description: "",
+            description: #description,
         })
     })
 }

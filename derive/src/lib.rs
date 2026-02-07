@@ -438,8 +438,10 @@ fn derive_field_metadata(
     if let Some(ref export_ops) = export_ops
         && export_ops.is_flatten()
     {
+        let description = field_description(field);
+
         return Ok(quote_spanned! { field.span() =>
-            builder.add_property_group(<#rust_ty as ::godot_rust_script::ScriptExportGroup>::properties().build(#name, ""));
+            builder.add_property_group(<#rust_ty as ::godot_rust_script::ScriptExportGroup>::properties().build(#name, #description));
         });
     }
 
@@ -584,6 +586,7 @@ fn derive_export_group(
                 ExportGroup::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
 
             let group_name = group.name;
+            let description = field_description(field);
 
             Ok(quote_spanned! { first_attr.span() =>
                 builder.add_property(::godot_rust_script::private_export::RustScriptPropDesc {
@@ -593,7 +596,7 @@ fn derive_export_group(
                     usage: #property_usage_ty::GROUP,
                     hint: #property_hint_ty::NONE,
                     hint_string: String::new(),
-                    description: "",
+                    description: #description,
                 });
             })
         })
@@ -615,6 +618,7 @@ fn derive_export_subgroup(
                 ExportSubgroup::from_attributes(&field.attrs).map_err(|err| err.write_errors())?;
 
             let group_name = group.name;
+            let description = field_description(field);
 
             Ok(quote_spanned! { first_attr.span() =>
                 builder.add_property(::godot_rust_script::private_export::RustScriptPropDesc {
@@ -624,7 +628,7 @@ fn derive_export_subgroup(
                     usage: #property_usage_ty::SUBGROUP,
                     hint: #property_hint_ty::NONE,
                     hint_string: String::new(),
-                    description: "",
+                    description: #description,
                 });
             })
         })
@@ -717,4 +721,24 @@ pub fn derive_property_subgroup(input: proc_macro::TokenStream) -> proc_macro::T
         input,
         false,
     )
+}
+
+fn field_description(field: &FieldOpts) -> TokenStream {
+    field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("doc"))
+        .map(|attr| {
+            attr.meta
+                .require_name_value()
+                .unwrap()
+                .value
+                .to_token_stream()
+        })
+        .reduce(|mut acc, ident| {
+            acc.extend(quote!(, "\n", ));
+            acc.extend(ident);
+            acc
+        })
+        .unwrap_or_else(|| quote!(""))
 }

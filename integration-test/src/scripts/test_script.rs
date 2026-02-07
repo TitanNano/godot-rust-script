@@ -70,6 +70,7 @@ struct TestScript {
     #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
     pub script_ref: OnEditor<RsRef<TestScript>>,
 
+    /// Optional property group that can be toggled.
     #[cfg(since_api = "4.5")]
     #[export(flatten)]
     pub property_group: Option<PropertyGroup>,
