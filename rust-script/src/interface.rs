@@ -6,6 +6,7 @@
 
 mod export;
 mod on_editor;
+mod property_group;
 mod signals;
 
 use std::marker::PhantomData;
@@ -22,6 +23,9 @@ use crate::runtime::RustScript;
 
 pub use export::GodotScriptExport;
 pub use on_editor::OnEditor;
+pub use property_group::{
+    ExportGroupBuilder, ExportSubgroupBuilder, ScriptExportGroup, ScriptExportSubgroup,
+};
 #[expect(deprecated)]
 pub use signals::{ScriptSignal, Signal};
 

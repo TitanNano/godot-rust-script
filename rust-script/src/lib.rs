@@ -11,16 +11,18 @@ mod interface;
 mod runtime;
 mod static_script_registry;
 
-pub use godot_rust_script_derive::{godot_script_impl, GodotScript, GodotScriptEnum};
+pub use godot_rust_script_derive::{
+    GodotScript, GodotScriptEnum, ScriptExportGroup, ScriptExportSubgroup, godot_script_impl,
+};
 pub use interface::*;
 pub use runtime::RustScriptExtensionLayer;
 
 #[doc(hidden)]
 pub mod private_export {
     pub use crate::static_script_registry::{
-        assemble_metadata, create_default_data_struct, RegistryItem, RustScriptEntry,
-        RustScriptEntryMethods, RustScriptMetaData, RustScriptMethodDesc, RustScriptPropDesc,
-        RustScriptSignalDesc, SCRIPT_REGISTRY,
+        RegistryItem, RustScriptEntry, RustScriptEntryMethods, RustScriptMetaData,
+        RustScriptMethodDesc, RustScriptPropDesc, RustScriptSignalDesc, SCRIPT_REGISTRY,
+        assemble_metadata, create_default_data_struct,
     };
     pub use const_str::{concat, replace, strip_prefix, unwrap};
     pub use godot::sys::{plugin_add, plugin_registry};

@@ -5,10 +5,10 @@
  */
 
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    parse2, parse_macro_input, spanned::Spanned, FnArg, Ident, ImplItem, ImplItemFn, ItemImpl,
-    PatIdent, PatType, ReturnType, Token, Type, Visibility,
+    FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, PatIdent, PatType, ReturnType, Token, Type,
+    Visibility, parse_macro_input, parse2, spanned::Spanned,
 };
 
 use crate::{
@@ -45,7 +45,7 @@ pub fn godot_script_impl(
                 ty @ ReturnType::Default => syn::parse2::<Type>(quote_spanned!(ty.span() => ())).map_err(|err| err.into_compile_error())?,
                 ReturnType::Type(_, ty) => (**ty).to_owned(),
             };
-            let fn_return_ty = rust_to_variant_type(&fn_return_ty_rust)?;
+            let fn_return_ty = rust_to_variant_type(&fn_return_ty_rust).map_err(|err| err.write_errors())?;
             let is_static = !fnc.sig.inputs.iter().any(|arg| matches!(arg, FnArg::Receiver(_)));
 
             let args: Vec<(TokenStream, TokenStream)> = fnc.sig.inputs
@@ -71,7 +71,7 @@ pub fn godot_script_impl(
                             quote_spanned! {
                                 arg.span() =>
                                 ::godot_rust_script::private_export::RustScriptPropDesc {
-                                    name: stringify!(#arg_name),
+                                    name: stringify!(#arg_name).into(),
                                     ty: #arg_type,
                                     class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
                                     usage: #godot_types::global::PropertyUsageFlags::NONE,
@@ -133,7 +133,7 @@ pub fn godot_script_impl(
                         #fn_name_str,
                         Box::new([#args_meta]),
                         ::godot_rust_script::private_export::RustScriptPropDesc {
-                            name: #fn_name_str,
+                            name: #fn_name_str.into(),
                             ty: #fn_return_ty,
                             class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
                             usage: #godot_types::global::PropertyUsageFlags::NONE,

@@ -22,22 +22,21 @@ godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 
 #[macro_export]
 macro_rules! register_script_class {
-    ($class_name:ty, $base_name:ty, $desc:expr, $props:expr, $signals:expr, $is_tool: literal) => {
+    ($class_name:ty, $base_name:ty, $desc:expr, $is_tool: literal, $builder:ident => $props:tt) => {
         $crate::private_export::plugin_add! {
             $crate::private_export::SCRIPT_REGISTRY;
-            $crate::private_export::RegistryItem::Entry($crate::private_export::RustScriptEntry {
-                class_name: stringify!($class_name),
-                class_name_cstr: ::std::ffi::CStr::from_bytes_with_nul(concat!(stringify!($class_name), "\0").as_bytes()).unwrap(),
-                base_type_name: <$base_name as $crate::godot::prelude::GodotClass>::class_id().to_cow_str(),
-                properties: || {
-                    $props
-                },
-                signals: || {
-                    $signals
-                },
-                create_data: $crate::private_export::create_default_data_struct::<$class_name>,
-                description: $desc,
-                is_tool: $is_tool,
+            $crate::private_export::RegistryItem::Entry(|| {
+                let mut $builder = $crate::private_export::RustScriptEntry::builder(
+                    stringify!($class_name),
+                    <$base_name as $crate::godot::prelude::GodotClass>::class_id().to_cow_str(),
+                    $desc,
+                    $crate::private_export::create_default_data_struct::<$class_name>,
+                )
+                .with_is_tool($is_tool);
+
+                $props
+
+                $builder.build()
             })
         }
     };
@@ -61,13 +60,82 @@ macro_rules! register_script_methods {
 
 pub struct RustScriptEntry {
     pub class_name: &'static str,
-    pub class_name_cstr: &'static std::ffi::CStr,
     pub base_type_name: Cow<'static, str>,
-    pub properties: fn() -> Vec<RustScriptPropDesc>,
-    pub signals: fn() -> Vec<RustScriptSignalDesc>,
+    pub properties: Box<[RustScriptPropDesc]>,
+    pub signals: Box<[RustScriptSignalDesc]>,
     pub create_data: fn(Gd<Object>) -> Box<dyn GodotScriptObject>,
     pub description: &'static str,
     pub is_tool: bool,
+}
+
+impl RustScriptEntry {
+    pub fn builder(
+        class_name: &'static str,
+        base_type_name: Cow<'static, str>,
+        description: &'static str,
+        create_data: fn(Gd<Object>) -> Box<dyn GodotScriptObject>,
+    ) -> RustScriptEntryBuilder {
+        RustScriptEntryBuilder {
+            class_name,
+            base_type_name,
+            properties: Vec::new(),
+            signals: Vec::new(),
+            create_data,
+            description,
+            is_tool: false,
+        }
+    }
+}
+
+pub struct RustScriptEntryBuilder {
+    class_name: &'static str,
+    base_type_name: Cow<'static, str>,
+    properties: Vec<RustScriptPropDesc>,
+    signals: Vec<RustScriptSignalDesc>,
+    create_data: fn(Gd<Object>) -> Box<dyn GodotScriptObject>,
+    description: &'static str,
+    is_tool: bool,
+}
+
+impl RustScriptEntryBuilder {
+    pub fn add_property(&mut self, prop: RustScriptPropDesc) {
+        self.properties.push(prop);
+    }
+
+    pub fn add_property_group(&mut self, prop_group: Box<[RustScriptPropDesc]>) {
+        self.properties.extend(prop_group);
+    }
+
+    pub fn add_signal(&mut self, signal: RustScriptSignalDesc) {
+        self.signals.push(signal);
+    }
+
+    pub fn with_is_tool(mut self, is_tool: bool) -> Self {
+        self.is_tool = is_tool;
+        self
+    }
+
+    pub fn build(self) -> RustScriptEntry {
+        let Self {
+            class_name,
+            base_type_name,
+            properties,
+            signals,
+            create_data,
+            description,
+            is_tool,
+        } = self;
+
+        RustScriptEntry {
+            class_name,
+            base_type_name,
+            properties: properties.into(),
+            signals: signals.into(),
+            create_data,
+            description,
+            is_tool,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -107,13 +175,13 @@ impl RustScriptEntryMethodsBuilder {
 }
 
 pub enum RegistryItem {
-    Entry(RustScriptEntry),
+    Entry(fn() -> RustScriptEntry),
     Methods(fn() -> RustScriptEntryMethods),
 }
 
 #[derive(Debug, Clone)]
 pub struct RustScriptPropDesc {
-    pub name: &'static str,
+    pub name: Cow<'static, str>,
     pub ty: VariantType,
     pub class_name: ClassId,
     pub usage: PropertyUsageFlags,
@@ -199,7 +267,7 @@ pub fn assemble_metadata<'a>(
 ) -> Vec<RustScriptMetaData> {
     let (entries, methods): (Vec<_>, Vec<_>) = items
         .map(|item| match item {
-            RegistryItem::Entry(entry) => (Some(entry), None),
+            RegistryItem::Entry(entry) => (Some(entry()), None),
             RegistryItem::Methods(methods) => {
                 let methods = methods();
 
@@ -214,7 +282,7 @@ pub fn assemble_metadata<'a>(
         .into_iter()
         .flatten()
         .map(|class| {
-            let props = (class.properties)().into();
+            let props = class.properties.clone();
 
             let methods = methods
                 .get(class.class_name)
@@ -222,7 +290,7 @@ pub fn assemble_metadata<'a>(
                 .flat_map(|entry| entry.methods.clone())
                 .collect();
 
-            let signals = (class.signals)().into();
+            let signals = class.signals.clone();
 
             let create_data: Box<dyn CreateScriptInstanceData> = Box::new(class.create_data);
             let description = class.description;
@@ -245,7 +313,7 @@ impl From<&RustScriptPropDesc> for PropertyInfo {
     fn from(value: &RustScriptPropDesc) -> Self {
         Self {
             variant_type: value.ty,
-            property_name: value.name.into(),
+            property_name: value.name.as_ref().into(),
             class_id: value.class_name,
             hint_info: PropertyHintInfo {
                 hint: value.hint,
@@ -437,7 +505,7 @@ mod tests {
             "add_member",
             Box::new([]),
             super::RustScriptPropDesc {
-                name: "",
+                name: "".into(),
                 ty: VariantType::BOOL,
                 class_name: get_class_id("Node"),
                 usage: PropertyUsageFlags::NONE,

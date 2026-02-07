@@ -4,9 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+pub mod negative_tests;
 mod scripts;
 
-use godot::prelude::{gdextension, ExtensionLibrary, InitLevel};
+use godot::prelude::{ExtensionLibrary, InitLevel, gdextension};
 
 struct ExtensionLib;
 

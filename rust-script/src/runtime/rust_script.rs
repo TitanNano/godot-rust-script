@@ -416,7 +416,7 @@ impl IScriptExtension for RustScript {
             self.map_property_info_list(|prop| {
                 (prop.usage.ord() & PropertyUsageFlags::EDITOR.ord()
                     != PropertyUsageFlags::NONE.ord())
-                .then_some(prop.name)
+                .then_some(prop.name.clone())
             })
         } else {
             Vec::with_capacity(0)
@@ -436,9 +436,9 @@ impl IScriptExtension for RustScript {
                     .iter()
                     .flatten()
                     .map(|key| {
-                        let value = object.get(*key);
+                        let value = object.get(key.as_ref());
 
-                        (*key, value)
+                        (key.as_ref(), value)
                     })
                     .collect()
             } else {
@@ -515,7 +515,7 @@ impl IScriptExtension for RustScript {
                 class
                     .properties()
                     .iter()
-                    .map(|prop| StringName::from(prop.name))
+                    .map(|prop| StringName::from(prop.name.as_ref()))
                     .collect()
             })
             .unwrap_or_default()

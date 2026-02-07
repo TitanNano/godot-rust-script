@@ -9,8 +9,8 @@ use godot::classes::{Node, Node3D};
 use godot::global::PropertyHint;
 use godot::obj::{Gd, NewAlloc};
 use godot_rust_script::{
-    godot_script_impl, CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef,
-    ScriptSignal,
+    CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef, ScriptExportGroup,
+    ScriptExportSubgroup, ScriptSignal, godot_script_impl,
 };
 
 #[derive(Debug, Default, GodotScriptEnum)]
@@ -70,7 +70,29 @@ struct TestScript {
     #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
     pub script_ref: OnEditor<RsRef<TestScript>>,
 
+    /// Optional property group that can be toggled.
+    #[cfg(since_api = "4.5")]
+    #[export(flatten)]
+    pub property_group: Option<PropertyGroup>,
+
+    #[cfg(before_api = "4.5")]
+    #[export(flatten)]
+    pub property_group: PropertyGroup,
+
     base: Gd<<Self as GodotScript>::Base>,
+}
+
+#[derive(Debug, Default, ScriptExportGroup)]
+struct PropertyGroup {
+    item1: u32,
+    #[export(flatten)]
+    item2: PropertySubgroup,
+    item3: OnEditor<Gd<Node3D>>,
+}
+
+#[derive(ScriptExportSubgroup, Default, Debug)]
+struct PropertySubgroup {
+    subitem: f32,
 }
 
 #[godot_script_impl]
