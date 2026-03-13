@@ -4,7 +4,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::ffi::{c_void, OsStr};
+use std::ffi::{OsStr, c_void};
 
 use godot::classes::class_macros::private::virtuals::Os::VarDictionary;
 use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
@@ -12,17 +12,18 @@ use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
 use godot::classes::script_language::ScriptNameCasing;
 use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
 use godot::global::{self, godot_error};
+use godot::meta::RawPtr;
 use godot::obj::{Base, Singleton as _};
 use godot::prelude::{
-    godot_api, Array, GString, Gd, GodotClass, Object, PackedStringArray, StringName, VarArray,
-    Variant,
+    AnyDictionary, Array, GString, Gd, GodotClass, Object, PackedStringArray, StringName, VarArray,
+    Variant, godot_api,
 };
 use itertools::Itertools;
 
 use crate::apply::Apply;
 use crate::static_script_registry::RustScriptMetaData;
 
-use super::{rust_script::RustScript, SCRIPT_REGISTRY};
+use super::{SCRIPT_REGISTRY, rust_script::RustScript};
 
 #[derive(GodotClass)]
 #[class(base = ScriptLanguageExtension, tool)]
@@ -97,19 +98,19 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     /// Thread exit hook will be called before leaving a thread
     fn thread_exit(&mut self) {}
 
-    fn get_public_functions(&self) -> Array<VarDictionary> {
+    fn get_public_functions(&self) -> Array<AnyDictionary> {
         Array::new()
     }
 
-    fn get_public_constants(&self) -> VarDictionary {
-        VarDictionary::new()
+    fn get_public_constants(&self) -> AnyDictionary {
+        VarDictionary::new().upcast_any_dictionary()
     }
 
-    fn get_public_annotations(&self) -> Array<VarDictionary> {
+    fn get_public_annotations(&self) -> Array<AnyDictionary> {
         Array::new()
     }
 
-    /// frame hook will be called for each reandered frame
+    /// Frame hook will be called for each rendered frame.
     fn frame(&mut self) {}
 
     fn handles_global_class_type(&self, type_: GString) -> bool {
@@ -148,7 +149,9 @@ impl IScriptLanguageExtension for RustScriptLanguage {
             .scripts_src_dir
             .map(|path| ProjectSettings::singleton().localize_path(path))
         else {
-            return GString::from("Unable to validate script location! RustScript source location is known in the current execution context.");
+            return GString::from(
+                "Unable to validate script location! RustScript source location is known in the current execution context.",
+            );
         };
 
         if !path.to_string().starts_with(&rs_root.to_string()) {
@@ -183,18 +186,20 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         PackedStringArray::new()
     }
 
-    fn get_global_class_name(&self, path: GString) -> VarDictionary {
+    fn get_global_class_name(&self, path: GString) -> AnyDictionary {
         let class_name = Self::path_to_class_name(&path);
 
         Self::with_script_metadata(&class_name, |script_data| {
             let Some(script) = script_data else {
-                return VarDictionary::new();
+                return VarDictionary::new().upcast_any_dictionary();
             };
 
-            VarDictionary::new().apply(|dict| {
-                dict.set("name", &*class_name);
-                dict.set("base_type", script.base_type_name());
-            })
+            VarDictionary::new()
+                .apply(|dict| {
+                    dict.set("name", &*class_name);
+                    dict.set("base_type", &script.base_type_name());
+                })
+                .upcast_any_dictionary()
         })
     }
 
@@ -230,18 +235,18 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         _validate_errors: bool,
         _validate_warnings: bool,
         _validate_safe_lines: bool,
-    ) -> VarDictionary {
+    ) -> AnyDictionary {
         let mut validation = VarDictionary::new();
 
         validation.set("valid", "true");
-        validation.set("errors", VarArray::new());
-        validation.set("functions", VarArray::new());
-        validation.set("warnings", VarArray::new());
+        validation.set("errors", &VarArray::new());
+        validation.set("functions", &VarArray::new());
+        validation.set("warnings", &VarArray::new());
 
-        validation
+        validation.upcast_any_dictionary()
     }
 
-    // godot hook to trigger script reload
+    // Godot hook to trigger script reload
     fn reload_all_scripts(&mut self) {}
 
     fn init_ext(&mut self) {}
@@ -251,7 +256,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     fn is_control_flow_keyword(&self, #[expect(unused)] keyword: GString) -> bool {
         false
     }
-    fn get_built_in_templates(&self, #[expect(unused)] object: StringName) -> Array<VarDictionary> {
+    fn get_built_in_templates(&self, #[expect(unused)] object: StringName) -> Array<AnyDictionary> {
         Array::new()
     }
 
@@ -289,8 +294,8 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         code: GString,
         path: GString,
         owner: Option<Gd<Object>>,
-    ) -> VarDictionary {
-        VarDictionary::new()
+    ) -> AnyDictionary {
+        VarDictionary::new().upcast_any_dictionary()
     }
 
     #[expect(unused_variables)]
@@ -300,8 +305,8 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         symbol: GString,
         path: GString,
         owner: Option<Gd<Object>>,
-    ) -> VarDictionary {
-        VarDictionary::new()
+    ) -> AnyDictionary {
+        VarDictionary::new().upcast_any_dictionary()
     }
 
     fn auto_indent_code(
@@ -352,8 +357,8 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         level: i32,
         max_subitems: i32,
         max_depth: i32,
-    ) -> VarDictionary {
-        VarDictionary::new()
+    ) -> AnyDictionary {
+        VarDictionary::new().upcast_any_dictionary()
     }
 
     #[expect(unused_variables)]
@@ -362,18 +367,18 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         level: i32,
         max_subitems: i32,
         max_depth: i32,
-    ) -> VarDictionary {
-        VarDictionary::new()
+    ) -> AnyDictionary {
+        VarDictionary::new().upcast_any_dictionary()
     }
 
     #[expect(unused_variables)]
-    unsafe fn debug_get_stack_level_instance_rawptr(&mut self, level: i32) -> *mut c_void {
+    unsafe fn debug_get_stack_level_instance_rawptr(&mut self, level: i32) -> RawPtr<*mut c_void> {
         unimplemented!("debugging is not implemented!");
     }
 
     #[expect(unused_variables)]
-    fn debug_get_globals(&mut self, max_subitems: i32, max_depth: i32) -> VarDictionary {
-        VarDictionary::new()
+    fn debug_get_globals(&mut self, max_subitems: i32, max_depth: i32) -> AnyDictionary {
+        VarDictionary::new().upcast_any_dictionary()
     }
 
     #[expect(unused_variables)]
@@ -387,7 +392,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         GString::new()
     }
 
-    fn debug_get_current_stack_info(&mut self) -> Array<VarDictionary> {
+    fn debug_get_current_stack_info(&mut self) -> Array<AnyDictionary> {
         Array::default()
     }
 
@@ -409,7 +414,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     #[expect(unused_variables)]
     unsafe fn profiling_get_accumulated_data_rawptr(
         &mut self,
-        info_array: *mut ScriptLanguageExtensionProfilingInfo,
+        info_array: RawPtr<*mut ScriptLanguageExtensionProfilingInfo>,
         info_max: i32,
     ) -> i32 {
         0
@@ -418,7 +423,7 @@ impl IScriptLanguageExtension for RustScriptLanguage {
     #[expect(unused_variables)]
     unsafe fn profiling_get_frame_data_rawptr(
         &mut self,
-        info_array: *mut ScriptLanguageExtensionProfilingInfo,
+        info_array: RawPtr<*mut ScriptLanguageExtensionProfilingInfo>,
         info_max: i32,
     ) -> i32 {
         0

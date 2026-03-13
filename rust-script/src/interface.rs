@@ -14,7 +14,7 @@ use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fmt::Debug};
 
 use godot::meta::error::CallErrorType;
-use godot::meta::{ByValue, FromGodot, GodotConvert, ToGodot};
+use godot::meta::{ByValue, ClassId, FromGodot, GodotConvert, GodotShape, ToGodot};
 use godot::obj::Inherits;
 use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 
@@ -122,6 +122,10 @@ impl<T: GodotScript> Clone for RsRef<T> {
 
 impl<T: GodotScript> GodotConvert for RsRef<T> {
     type Via = Gd<T::Base>;
+
+    fn godot_shape() -> GodotShape {
+        Gd::<T::Base>::godot_shape()
+    }
 }
 
 impl<T: GodotScript> FromGodot for RsRef<T>
@@ -145,12 +149,22 @@ impl<T: GodotScript> ::godot::prelude::Var for RsRef<T>
 where
     Self: GodotConvert,
 {
-    fn get_property(&self) -> Self::Via {
-        <Self as ToGodot>::to_godot(self)
+    type PubType = Self::Via;
+
+    fn var_get(field: &Self) -> Self::Via {
+        <Self as ToGodot>::to_godot(field)
     }
 
-    fn set_property(&mut self, value: Self::Via) {
-        <Self as FromGodot>::from_godot(value);
+    fn var_set(field: &mut Self, value: Self::Via) {
+        *field = <Self as FromGodot>::from_godot(value);
+    }
+
+    fn var_pub_get(field: &Self) -> Self::PubType {
+        Self::var_get(field)
+    }
+
+    fn var_pub_set(field: &mut Self, value: Self::PubType) {
+        Self::var_set(field, value);
     }
 }
 
@@ -246,7 +260,7 @@ where
     T: godot::prelude::Var,
 {
     fn get_property(&self) -> Self::Via {
-        T::get_property(self)
+        T::var_get(self)
     }
 }
 
@@ -255,7 +269,7 @@ where
     T: godot::prelude::Var,
 {
     fn set_property(&mut self, value: Self::Via) {
-        T::set_property(self, value);
+        T::var_set(self, value);
     }
 }
 
@@ -324,4 +338,35 @@ macro_rules! deinit {
     () => {
         $crate::RustScriptExtensionLayer::deinitialize()
     };
+}
+
+pub fn class_id_for_shape(shape: GodotShape) -> ClassId {
+    match shape {
+        GodotShape::Variant => ClassId::none(),
+        GodotShape::Builtin { variant_type: _ } => ClassId::none(),
+        GodotShape::Class {
+            class_id,
+            heritage: _,
+        } => class_id,
+        GodotShape::TypedArray { element } => class_id_for_shape(element.into_outer()),
+        GodotShape::TypedDictionary { key: _, value: _ } => ClassId::none(),
+        GodotShape::Enum {
+            variant_type: _,
+            enumerators: _,
+            godot_name,
+            is_bitfield: _,
+        } => godot_name
+            .map(ClassId::new_dynamic)
+            .unwrap_or_else(ClassId::none),
+        GodotShape::Custom {
+            variant_type: _,
+            var_hint: _,
+            export_hint: _,
+            class_name,
+            usage_flags: _,
+        } => class_name
+            .map(ClassId::new_dynamic)
+            .unwrap_or_else(ClassId::none),
+        _ => ClassId::none(),
+    }
 }

@@ -5,14 +5,14 @@
  */
 
 use darling::{
+    FromDeriveInput, FromVariant,
     ast::Data,
     util::{Ignored, WithOriginal},
-    FromDeriveInput, FromVariant,
 };
 use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::{parse_macro_input, spanned::Spanned, DeriveInput, Ident, Meta, Visibility};
+use syn::{DeriveInput, Ident, Meta, Visibility, parse_macro_input, spanned::Spanned};
 
 use crate::type_paths::{convert_error_ty, godot_types, property_hints};
 
@@ -102,6 +102,15 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
         impl #godot_types::meta::GodotConvert for #enum_ident {
             type Via = u8;
+
+            fn godot_shape() -> ::godot::meta::GodotShape {
+                ::godot::meta::GodotShape::Enum {
+                    godot_name: None,
+                    variant_type: ::godot::builtin::VariantType::INT,
+                    is_bitfield: false,
+                    enumerators: ::std::borrow::Cow::Borrowed(&[]),
+                }
+            }
         }
 
         impl GodotScriptEnum for #enum_ident {}
@@ -137,12 +146,22 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         }
 
         impl #godot_types::prelude::Var for #enum_ident {
-            fn get_property(&self) -> Self::Via {
-                self.into()
+            type PubType = Self::Via;
+
+            fn var_get(field: &Self) -> Self::Via {
+                field.into()
             }
 
-            fn set_property(&mut self, value: Self::Via) {
-                *self = #godot_types::meta::FromGodot::try_from_godot(value).unwrap();
+            fn var_pub_get(field: &Self) -> Self::PubType {
+                #enum_ident::var_get(field)
+            }
+
+            fn var_set(field: &mut Self, value: Self::Via) {
+                *field = #godot_types::meta::FromGodot::try_from_godot(value).unwrap();
+            }
+
+            fn var_pub_set(field: &mut Self, value: Self::PubType) {
+                #enum_ident::var_set(field, value);
             }
         }
 

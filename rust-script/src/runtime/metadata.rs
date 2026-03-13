@@ -4,11 +4,10 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::borrow::Cow;
 use std::ops::Deref;
 
-use godot::meta::{ClassId, MethodInfo, PropertyInfo};
-use godot::obj::{EngineBitfield, EngineEnum};
+use godot::builtin::StringName;
+use godot::meta::{MethodInfo, PropertyInfo};
 use godot::prelude::{Array, VarDictionary};
 use godot::sys::VariantType;
 
@@ -22,12 +21,12 @@ impl ToDictionary for PropertyInfo {
     fn to_dict(&self) -> VarDictionary {
         let mut dict = VarDictionary::new();
 
-        dict.set("name", self.property_name.clone());
-        dict.set("class_name", self.class_id.to_string_name());
-        dict.set("type", self.variant_type.ord());
-        dict.set("hint", self.hint_info.hint.ord());
-        dict.set("hint_string", self.hint_info.hint_string.clone());
-        dict.set("usage", self.usage.ord());
+        dict.set("name", &self.property_name);
+        dict.set("class_name", &self.class_name);
+        dict.set("type", self.variant_type);
+        dict.set("hint", self.hint_info.hint);
+        dict.set("hint_string", &self.hint_info.hint_string);
+        dict.set("usage", self.usage);
 
         dict
     }
@@ -36,14 +35,14 @@ impl ToDictionary for PropertyInfo {
 impl ToDictionary for MethodInfo {
     fn to_dict(&self) -> VarDictionary {
         VarDictionary::new().apply(|dict| {
-            dict.set("name", self.method_name.clone());
-            dict.set("flags", self.flags.ord());
+            dict.set("name", &self.method_name);
+            dict.set("flags", self.flags);
 
             let args: Array<_> = self.arguments.iter().map(|arg| arg.to_dict()).collect();
 
-            dict.set("args", args);
+            dict.set("args", &args);
 
-            dict.set("return", self.return_type.to_dict());
+            dict.set("return", &self.return_type.to_dict());
         })
     }
 }
@@ -94,9 +93,9 @@ fn variant_type_to_str(var_type: VariantType) -> &'static str {
     }
 }
 
-fn prop_doc_type(prop_type: VariantType, class_name: ClassId) -> Cow<'static, str> {
+fn prop_doc_type(prop_type: VariantType, class_name: &StringName) -> StringName {
     match prop_type {
-        VariantType::OBJECT => class_name.to_cow_str(),
+        VariantType::OBJECT => class_name.clone(),
         _ => variant_type_to_str(prop_type).into(),
     }
 }
@@ -114,14 +113,14 @@ impl ToMethodDoc for MethodInfo {
             .collect();
 
         VarDictionary::new().apply(|dict| {
-            dict.set("name", self.method_name.clone());
+            dict.set("name", &self.method_name);
             dict.set(
                 "return_type",
-                prop_doc_type(self.return_type.variant_type, self.return_type.class_id).as_ref(),
+                &prop_doc_type(self.return_type.variant_type, &self.return_type.class_name),
             );
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
-            dict.set("arguments", args);
+            dict.set("arguments", &args);
         })
     }
 }
@@ -191,11 +190,8 @@ pub trait ToArgumentDoc {
 impl ToArgumentDoc for PropertyInfo {
     fn to_argument_doc(&self) -> VarDictionary {
         VarDictionary::new().apply(|dict| {
-            dict.set("name", self.property_name.clone());
-            dict.set(
-                "type",
-                prop_doc_type(self.variant_type, self.class_id).as_ref(),
-            );
+            dict.set("name", &self.property_name);
+            dict.set("type", &prop_doc_type(self.variant_type, &self.class_name));
         })
     }
 }
@@ -215,11 +211,8 @@ pub trait ToPropertyDoc {
 impl ToPropertyDoc for PropertyInfo {
     fn to_property_doc(&self) -> VarDictionary {
         VarDictionary::new().apply(|dict| {
-            dict.set("name", self.property_name.clone());
-            dict.set(
-                "type",
-                prop_doc_type(self.variant_type, self.class_id).as_ref(),
-            );
+            dict.set("name", &self.property_name);
+            dict.set("type", &prop_doc_type(self.variant_type, &self.class_name));
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
         })

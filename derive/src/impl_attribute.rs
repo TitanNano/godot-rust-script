@@ -73,7 +73,7 @@ pub fn godot_script_impl(
                                 ::godot_rust_script::private_export::RustScriptPropDesc {
                                     name: stringify!(#arg_name).into(),
                                     ty: #arg_type,
-                                    class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
+                                    class_name: ::godot_rust_script::class_id_for_shape(<#arg_rust_type as #godot_types::meta::GodotConvert>::godot_shape()),
                                     usage: #godot_types::global::PropertyUsageFlags::NONE,
                                     hint: #property_hints::NONE,
                                     hint_string: String::new(),
@@ -135,7 +135,7 @@ pub fn godot_script_impl(
                         ::godot_rust_script::private_export::RustScriptPropDesc {
                             name: #fn_name_str.into(),
                             ty: #fn_return_ty,
-                            class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
+                            class_name: ::godot_rust_script::class_id_for_shape(<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::godot_shape()),
                             usage: #godot_types::global::PropertyUsageFlags::NONE,
                             hint: #property_hints::NONE,
                             hint_string: String::new(),

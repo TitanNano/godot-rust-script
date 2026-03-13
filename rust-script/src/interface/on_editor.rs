@@ -39,6 +39,10 @@ where
     <T::Via as GodotType>::Ffi: GodotNullableFfi,
 {
     type Via = Option<T::Via>;
+
+    fn godot_shape() -> godot::meta::GodotShape {
+        T::godot_shape()
+    }
 }
 
 impl<T> godot::prelude::Var for OnEditor<T>
@@ -47,17 +51,33 @@ where
     Self: GodotConvert<Via = Option<T::Via>>,
     T::Via: Clone,
 {
-    fn get_property(&self) -> Self::Via {
-        match self.value {
+    type PubType = Self::Via;
+
+    fn var_get(field: &Self) -> Self::Via {
+        match field.value {
             ValueState::Invalid => None,
             ValueState::Valid(ref value) => Some(value.to_godot_owned()),
         }
     }
 
-    fn set_property(&mut self, value: Self::Via) {
+    fn var_set(field: &mut Self, value: Self::Via) {
         match value {
-            Some(value) => self.value = ValueState::Valid(T::from_godot(value)),
-            None => self.value = ValueState::Invalid,
+            Some(value) => field.value = ValueState::Valid(T::from_godot(value)),
+            None => field.value = ValueState::Invalid,
+        }
+    }
+
+    fn var_pub_get(field: &Self) -> Self::PubType {
+        match field.value {
+            ValueState::Invalid => None,
+            ValueState::Valid(ref value) => Some(value.to_godot_owned()),
+        }
+    }
+
+    fn var_pub_set(field: &mut Self, value: Self::PubType) {
+        match value {
+            Some(value) => field.value = ValueState::Valid(T::from_godot(value)),
+            None => field.value = ValueState::Invalid,
         }
     }
 }

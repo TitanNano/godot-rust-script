@@ -295,7 +295,7 @@ fn derive_property_metadata(
     Ok(quote_spanned! {
         field.ty.span() =>
         .add_property(::godot_rust_script::private_export::RustScriptPropDesc {
-            class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
+            class_name: ::godot_rust_script::class_id_for_shape(<#rust_ty as #godot_types::meta::GodotConvert>::godot_shape()),
             name: #field_name.into(),
             ty: #field_ty,
             hint: #hint,

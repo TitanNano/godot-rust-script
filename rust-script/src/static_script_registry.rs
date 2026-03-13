@@ -314,7 +314,7 @@ impl From<&RustScriptPropDesc> for PropertyInfo {
         Self {
             variant_type: value.ty,
             property_name: value.name.as_ref().into(),
-            class_id: value.class_name,
+            class_name: value.class_name.to_string_name(),
             hint_info: PropertyHintInfo {
                 hint: value.hint,
                 hint_string: value.hint_string.to_godot(),
@@ -332,7 +332,7 @@ impl From<&RustScriptSignalDesc> for MethodInfo {
             class_name: ClassId::none(),
             return_type: PropertyInfo {
                 variant_type: VariantType::NIL,
-                class_id: ClassId::none(),
+                class_name: StringName::default(),
                 property_name: StringName::default(),
                 hint_info: PropertyHintInfo {
                     hint: PropertyHint::NONE,
