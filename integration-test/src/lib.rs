@@ -7,23 +7,24 @@
 pub mod negative_tests;
 mod scripts;
 
-use godot::prelude::{ExtensionLibrary, InitLevel, gdextension};
+use godot::{
+    init::InitStage,
+    prelude::{ExtensionLibrary, gdextension},
+};
 
 struct ExtensionLib;
 
 #[gdextension]
 unsafe impl ExtensionLibrary for ExtensionLib {
-    fn on_level_init(level: InitLevel) {
-        match level {
-            InitLevel::Scene => godot_rust_script::init!(scripts),
-            InitLevel::Editor | InitLevel::Servers | InitLevel::Core => (),
+    fn on_stage_init(level: InitStage) {
+        if level == InitStage::Scene {
+            godot_rust_script::init!(scripts)
         }
     }
 
-    fn on_level_deinit(level: InitLevel) {
-        match level {
-            InitLevel::Scene => godot_rust_script::deinit!(),
-            InitLevel::Servers | InitLevel::Core | InitLevel::Editor => (),
+    fn on_stage_deinit(level: InitStage) {
+        if level == InitStage::Scene {
+            godot_rust_script::deinit!()
         }
     }
 }

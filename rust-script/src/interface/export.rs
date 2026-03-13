@@ -15,7 +15,7 @@ use godot::builtin::{
 };
 use godot::classes::{Node, Resource};
 use godot::global::PropertyHint;
-use godot::meta::{ArrayElement, GodotConvert, GodotType};
+use godot::meta::{Element, GodotConvert, GodotType};
 use godot::obj::{EngineEnum, Gd};
 use godot::prelude::GodotClass;
 use godot::register::property::BuiltinExport;
@@ -90,7 +90,7 @@ where
     }
 }
 
-impl<T: ArrayElement + GodotScriptExport + GodotType> GodotScriptExport for Array<T> {
+impl<T: Element + GodotScriptExport + GodotType> GodotScriptExport for Array<T> {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
         let element_type = <<T as GodotType>::Ffi as GodotFfi>::VARIANT_TYPE
             .variant_as_nil()

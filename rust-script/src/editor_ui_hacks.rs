@@ -4,11 +4,15 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+use std::borrow::Cow;
+
+use godot::builtin::VariantType;
 use godot::classes::{EditorInterface, Engine};
 use godot::global::godot_warn;
 use godot::meta::{ByValue, ToGodot};
 use godot::obj::Singleton as _;
 use godot::prelude::GodotConvert;
+use godot::register::property::Enumerator;
 
 #[derive(Clone, Copy)]
 pub enum EditorToasterSeverity {
@@ -27,6 +31,17 @@ impl From<EditorToasterSeverity> for u8 {
 
 impl GodotConvert for EditorToasterSeverity {
     type Via = u8;
+
+    fn godot_shape() -> godot::meta::GodotShape {
+        const ENUMERATORS: &[Enumerator] = &[Enumerator::new_int("Warning", 1)];
+
+        godot::meta::GodotShape::Enum {
+            variant_type: VariantType::INT,
+            enumerators: Cow::Borrowed(ENUMERATORS),
+            godot_name: Some(Cow::Borrowed("EditorToasterSeverity")),
+            is_bitfield: false,
+        }
+    }
 }
 
 impl ToGodot for EditorToasterSeverity {

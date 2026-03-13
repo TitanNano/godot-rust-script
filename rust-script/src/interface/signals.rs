@@ -10,8 +10,8 @@ use godot::builtin::{
     Callable, GString, NodePath, StringName, VarDictionary, Variant, Vector2, Vector3, Vector4,
 };
 use godot::classes::Object;
-use godot::global::{Error, PropertyHint, PropertyUsageFlags};
-use godot::meta::{ByValue, GodotConvert, GodotType, ToGodot};
+use godot::global::Error;
+use godot::meta::{ByValue, GodotConvert, ToGodot};
 use godot::obj::{Gd, GodotClass};
 
 use crate::static_script_registry::RustScriptPropDesc;
@@ -89,7 +89,7 @@ macro_rules! single_args {
             const COUNT: u8 = 1;
 
             fn to_variants(&self) -> Vec<Variant> {
-                vec![self.to_variant()]
+                vec![<Self as ToGodot>::to_variant(self)]
             }
 
             fn argument_desc(arg_names: Option<&[&'static str]>) -> Box<[RustScriptPropDesc]> {
@@ -111,11 +111,16 @@ macro_rules! signal_argument_desc {
     ($name:expr, $type:ty) => {
         RustScriptPropDesc {
             name: std::borrow::Cow::Borrowed($name),
-            ty: <<<$type as GodotConvert>::Via as GodotType>::Ffi as godot::sys::GodotFfi>::VARIANT_TYPE.variant_as_nil(),
-            class_name: <<$type as GodotConvert>::Via as GodotType>::class_id(),
-            usage: PropertyUsageFlags::NONE,
-            hint: PropertyHint::NONE,
-            hint_string: String::new(),
+            ty: <$type as GodotConvert>::godot_shape().variant_type(),
+            class_name: $crate::interface::class_id_for_shape(
+                <$type as GodotConvert>::godot_shape(),
+            ),
+            usage: <$type as GodotConvert>::godot_shape().usage_flags(),
+            hint: <$type as GodotConvert>::godot_shape().var_hint().hint,
+            hint_string: <$type as GodotConvert>::godot_shape()
+                .var_hint()
+                .hint_string
+                .to_string(),
             description: "",
         }
     };
@@ -127,7 +132,6 @@ single_args!(
     u8,
     u16,
     u32,
-    u64,
     i8,
     i16,
     i32,
@@ -226,6 +230,10 @@ impl<T: SignalArguments> ScriptSignal<T> {
 
 impl<T: SignalArguments> GodotConvert for ScriptSignal<T> {
     type Via = godot::builtin::Signal;
+
+    fn godot_shape() -> godot::meta::GodotShape {
+        godot::builtin::Signal::godot_shape()
+    }
 }
 
 impl<T: SignalArguments> ToGodot for ScriptSignal<T> {
