@@ -9,21 +9,21 @@ use quote::quote;
 
 #[inline]
 pub fn godot_types() -> TokenStream {
-    quote!(::godot_rust_script::godot)
+    quote!(::godot)
 }
 
 #[inline]
 pub fn property_hints() -> TokenStream {
     let godot_types = godot_types();
 
-    quote!(#godot_types::global::PropertyHint)
+    quote!(#godot_types::register::info::PropertyHint)
 }
 
 #[inline]
 pub fn property_usage() -> TokenStream {
     let godot_types = godot_types();
 
-    quote!(#godot_types::global::PropertyUsageFlags)
+    quote!(#godot_types::register::info::PropertyUsageFlags)
 }
 
 #[inline]
@@ -45,4 +45,11 @@ pub fn convert_error_ty() -> TokenStream {
     let godot_types = godot_types();
 
     quote!(#godot_types::meta::error::ConvertError)
+}
+
+#[inline]
+pub fn godot_shape() -> TokenStream {
+    let godot_types = godot_types();
+
+    quote!(#godot_types::meta::shape::GodotShape)
 }

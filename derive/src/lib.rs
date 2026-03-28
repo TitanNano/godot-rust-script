@@ -477,7 +477,7 @@ fn derive_field_metadata(
         builder.add_property(::godot_rust_script::private_export::RustScriptPropDesc {
             name: #name.into(),
             ty: #ty,
-            class_name: <<#rust_ty as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
+            class_name: ::godot_rust_script::class_id_for_shape(<#rust_ty as #godot_types::meta::GodotConvert>::godot_shape()),
             usage: #usage,
             hint: #hint,
             hint_string: #hint_string,

@@ -8,8 +8,8 @@ use std::collections::HashMap;
 
 use convert_case::{Case, Casing};
 use godot::builtin::{StringName, VariantType};
-use godot::global::{PropertyHint, PropertyUsageFlags};
 use godot::meta::ClassId;
+use godot::register::info::{PropertyHint, PropertyUsageFlags};
 
 use crate::private_export::RustScriptPropDesc;
 

@@ -12,7 +12,7 @@ use syn::{
 };
 
 use crate::{
-    extract_ident_from_type, is_context_type, rust_to_variant_type,
+    extract_ident_from_type, is_context_type, property_usage, rust_to_variant_type,
     type_paths::{godot_types, property_hints, string_name_ty, variant_ty},
 };
 
@@ -27,6 +27,7 @@ pub fn godot_script_impl(
     let variant_ty = variant_ty();
     let call_error_ty = quote!(#godot_types::meta::error::CallErrorType);
     let property_hints = property_hints();
+    let property_usage = property_usage();
 
     let current_type = &body.self_ty;
 
@@ -73,8 +74,8 @@ pub fn godot_script_impl(
                                 ::godot_rust_script::private_export::RustScriptPropDesc {
                                     name: stringify!(#arg_name).into(),
                                     ty: #arg_type,
-                                    class_name: <<#arg_rust_type as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
-                                    usage: #godot_types::global::PropertyUsageFlags::NONE,
+                                    class_name: ::godot_rust_script::class_id_for_shape(<#arg_rust_type as #godot_types::meta::GodotConvert>::godot_shape()),
+                                    usage: #property_usage::NONE,
                                     hint: #property_hints::NONE,
                                     hint_string: String::new(),
                                     description: "",
@@ -135,8 +136,8 @@ pub fn godot_script_impl(
                         ::godot_rust_script::private_export::RustScriptPropDesc {
                             name: #fn_name_str.into(),
                             ty: #fn_return_ty,
-                            class_name: <<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::Via as #godot_types::meta::GodotType>::class_id(),
-                            usage: #godot_types::global::PropertyUsageFlags::NONE,
+                            class_name: ::godot_rust_script::class_id_for_shape(<#fn_return_ty_rust as #godot_types::meta::GodotConvert>::godot_shape()),
+                            usage: #property_usage::NONE,
                             hint: #property_hints::NONE,
                             hint_string: String::new(),
                             description: "",

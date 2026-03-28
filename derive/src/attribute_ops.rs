@@ -12,7 +12,7 @@ use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{LitStr, Meta, PatPath, Type};
 
-use crate::type_paths::godot_types;
+use crate::type_paths::{property_hints, property_usage};
 
 #[derive(FromMeta, Debug)]
 pub struct FieldSignalOps(pub WithOriginal<Vec<syn::LitStr>, Meta>);
@@ -49,9 +49,8 @@ impl FieldExportOps {
     }
 
     pub fn to_export_meta(&self, ty: &Type, span: Span) -> Result<ExportMetadata, darling::Error> {
-        let godot_types = godot_types();
-        let property_hints = quote!(#godot_types::global::PropertyHint);
-        let property_usage = quote!(#godot_types::global::PropertyUsageFlags);
+        let property_hints = property_hints();
+        let property_usage = property_usage();
         let default_usage = quote!(#property_usage::SCRIPT_VARIABLE | #property_usage::EDITOR | #property_usage::STORAGE);
 
         let mut result: Option<ExportMetadata> = None;
