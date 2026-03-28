@@ -40,7 +40,7 @@ where
 {
     type Via = Option<T::Via>;
 
-    fn godot_shape() -> godot::meta::GodotShape {
+    fn godot_shape() -> godot::meta::shape::GodotShape {
         T::godot_shape()
     }
 }

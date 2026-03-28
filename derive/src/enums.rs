@@ -14,7 +14,7 @@ use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::{DeriveInput, Ident, Meta, Visibility, parse_macro_input, spanned::Spanned};
 
-use crate::type_paths::{convert_error_ty, godot_types, property_hints};
+use crate::type_paths::{convert_error_ty, godot_shape, godot_types, property_hints};
 
 #[derive(FromDeriveInput)]
 #[darling(supports(enum_unit), attributes(script_enum))]
@@ -34,6 +34,7 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
     let godot_types = godot_types();
     let convert_error = convert_error_ty();
     let property_hints = property_hints();
+    let godot_shape = godot_shape();
 
     let input = parse_macro_input!(input as DeriveInput);
     let input = EnumDeriveInput::from_derive_input(&input).unwrap();
@@ -93,7 +94,7 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         }
 
         impl #godot_types::meta::ToGodot for #enum_ident {
-            type Pass = ::godot::meta::ByValue;
+            type Pass = ::godot::meta::conv::ByValue;
 
             fn to_godot(&self) -> Self::Via {
                 #enum_from_self::from(self)
@@ -103,8 +104,8 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
         impl #godot_types::meta::GodotConvert for #enum_ident {
             type Via = u8;
 
-            fn godot_shape() -> ::godot::meta::GodotShape {
-                ::godot::meta::GodotShape::Enum {
+            fn godot_shape() -> #godot_shape {
+                #godot_shape::Enum {
                     godot_name: None,
                     variant_type: ::godot::builtin::VariantType::INT,
                     is_bitfield: false,

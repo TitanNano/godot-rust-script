@@ -11,7 +11,8 @@ use godot::builtin::{
 };
 use godot::classes::Object;
 use godot::global::Error;
-use godot::meta::{ByValue, GodotConvert, ToGodot};
+use godot::meta::conv::ByValue;
+use godot::meta::{GodotConvert, ToGodot};
 use godot::obj::{Gd, GodotClass};
 
 use crate::static_script_registry::RustScriptPropDesc;
@@ -231,7 +232,7 @@ impl<T: SignalArguments> ScriptSignal<T> {
 impl<T: SignalArguments> GodotConvert for ScriptSignal<T> {
     type Via = godot::builtin::Signal;
 
-    fn godot_shape() -> godot::meta::GodotShape {
+    fn godot_shape() -> godot::meta::shape::GodotShape {
         godot::builtin::Signal::godot_shape()
     }
 }

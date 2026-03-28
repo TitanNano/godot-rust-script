@@ -13,8 +13,10 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::{collections::HashMap, fmt::Debug};
 
+use godot::meta::conv::ByValue;
 use godot::meta::error::CallErrorType;
-use godot::meta::{ByValue, ClassId, FromGodot, GodotConvert, GodotShape, ToGodot};
+use godot::meta::shape::GodotShape;
+use godot::meta::{ClassId, FromGodot, GodotConvert, ToGodot};
 use godot::obj::Inherits;
 use godot::prelude::{ConvertError, Gd, Object, StringName, Variant};
 
@@ -343,10 +345,14 @@ macro_rules! deinit {
 pub fn class_id_for_shape(shape: GodotShape) -> ClassId {
     match shape {
         GodotShape::Variant => ClassId::none(),
-        GodotShape::Builtin { variant_type: _ } => ClassId::none(),
+        GodotShape::Builtin {
+            variant_type: _,
+            metadata: _,
+        } => ClassId::none(),
         GodotShape::Class {
             class_id,
             heritage: _,
+            is_nullable: _,
         } => class_id,
         GodotShape::TypedArray { element } => class_id_for_shape(element.into_outer()),
         GodotShape::TypedDictionary { key: _, value: _ } => ClassId::none(),
@@ -364,6 +370,7 @@ pub fn class_id_for_shape(shape: GodotShape) -> ClassId {
             export_hint: _,
             class_name,
             usage_flags: _,
+            metadata: _,
         } => class_name
             .map(ClassId::new_dynamic)
             .unwrap_or_else(ClassId::none),

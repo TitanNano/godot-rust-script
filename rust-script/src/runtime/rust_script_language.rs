@@ -12,7 +12,7 @@ use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
 use godot::classes::script_language::ScriptNameCasing;
 use godot::classes::{Engine, FileAccess, IScriptLanguageExtension, ProjectSettings, Script};
 use godot::global::{self, godot_error};
-use godot::meta::RawPtr;
+use godot::meta::conv::RawPtr;
 use godot::obj::{Base, Singleton as _};
 use godot::prelude::{
     AnyDictionary, Array, GString, Gd, GodotClass, Object, PackedStringArray, StringName, VarArray,

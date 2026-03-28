@@ -14,10 +14,10 @@ use godot::builtin::{
     Vector4, Vector4i,
 };
 use godot::classes::{Node, Resource};
-use godot::global::PropertyHint;
 use godot::meta::{Element, GodotConvert, GodotType};
 use godot::obj::{EngineEnum, Gd};
 use godot::prelude::GodotClass;
+use godot::register::info::PropertyHint;
 use godot::register::property::BuiltinExport;
 use godot::sys::GodotFfi;
 

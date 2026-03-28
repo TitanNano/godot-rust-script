@@ -6,8 +6,8 @@
 
 use godot::builtin::{Array, GString};
 use godot::classes::{Node, Node3D};
-use godot::global::PropertyHint;
 use godot::obj::{Gd, NewAlloc};
+use godot::register::info::PropertyHint;
 use godot_rust_script::{
     CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef, ScriptExportGroup,
     ScriptExportSubgroup, ScriptSignal, godot_script_impl,

@@ -9,9 +9,9 @@ use std::{collections::HashMap, ops::DerefMut};
 
 use godot::classes::Script;
 use godot::meta::error::CallErrorType;
-use godot::meta::{MethodInfo, PropertyInfo};
 use godot::obj::script::{ScriptInstance, SiMut};
 use godot::prelude::{GString, Gd, Object, StringName, Variant, VariantType};
+use godot::register::info::{MethodInfo, PropertyInfo};
 use godot_cell::blocking::GdCell;
 
 use super::Context;

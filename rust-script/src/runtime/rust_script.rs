@@ -13,11 +13,13 @@ use godot::classes::{
     ClassDb, Engine, IScriptExtension, Object, Script, ScriptExtension, ScriptLanguage,
     notify::ObjectNotification, object::ConnectFlags,
 };
-use godot::global::{PropertyUsageFlags, godot_error, godot_print, godot_warn};
-use godot::meta::{MethodInfo, PropertyInfo, RawPtr, ToGodot};
+use godot::global::{godot_error, godot_print, godot_warn};
+use godot::meta::ToGodot;
+use godot::meta::conv::RawPtr;
 use godot::obj::script::create_script_instance;
 use godot::obj::{Base, EngineBitfield, Gd, InstanceId, Singleton as _, WithBaseField};
 use godot::prelude::{GodotClass, godot_api};
+use godot::register::info::{MethodInfo, PropertyInfo, PropertyUsageFlags};
 
 use crate::apply::Apply;
 use crate::private_export::RustScriptPropDesc;

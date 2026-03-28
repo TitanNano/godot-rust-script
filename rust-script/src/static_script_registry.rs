@@ -10,9 +10,11 @@ use std::fmt::Debug;
 use std::sync::{Arc, LazyLock, RwLock};
 
 use godot::builtin::{GString, StringName};
-use godot::global::{MethodFlags, PropertyHint, PropertyUsageFlags};
-use godot::meta::{ClassId, MethodInfo, PropertyHintInfo, PropertyInfo, ToGodot};
+use godot::meta::{ClassId, ToGodot};
 use godot::prelude::{Gd, Object};
+use godot::register::info::{
+    MethodFlags, MethodInfo, PropertyHint, PropertyHintInfo, PropertyInfo, PropertyUsageFlags,
+};
 use godot::sys::VariantType;
 
 use crate::interface::GodotScript;
@@ -465,9 +467,9 @@ fn get_class_id(class_name: &'static str) -> ClassId {
 
 #[cfg(test)]
 mod tests {
-    use godot::global::PropertyHint;
-    use godot::global::PropertyUsageFlags;
-    use godot::{meta::ClassId, sys::VariantType};
+    use godot::meta::ClassId;
+    use godot::register::info::{PropertyHint, PropertyUsageFlags};
+    use godot::sys::VariantType;
 
     use crate::{
         private_export::{RustScriptEntryMethods, RustScriptMethodDesc},

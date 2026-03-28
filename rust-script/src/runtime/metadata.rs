@@ -7,8 +7,8 @@
 use std::ops::Deref;
 
 use godot::builtin::StringName;
-use godot::meta::{MethodInfo, PropertyInfo};
 use godot::prelude::{Array, VarDictionary};
+use godot::register::info::{MethodInfo, PropertyInfo};
 use godot::sys::VariantType;
 
 use crate::apply::Apply;
