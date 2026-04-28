@@ -50,9 +50,9 @@ impl IResourceFormatLoader for RustScriptResourceLoader {
 
     fn get_resource_type(&self, path: GString) -> GString {
         let script_lang = self.script_lang().bind();
-        let ext_match = path
-            .to_string()
-            .ends_with(&script_lang.get_extension().to_string());
+
+        let extension = script_lang.get_extension();
+        let ext_match = path.get_extension() == extension;
 
         if !ext_match {
             return GString::new();
