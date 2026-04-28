@@ -344,8 +344,10 @@ impl FieldExportOps {
             let attr_hint_str = &attr_custom.parsed.hint_string;
 
             let hint = quote_spanned!(attr_custom.original.span() => Some({ let hint: #property_hints = #attr_hint; hint }));
-            let hint_string =
-                quote_spanned!(attr_custom.original.span() => Some(String::from(#attr_hint_str)));
+            let hint_string = quote_spanned! { attr_custom.original.span() =>
+                #[allow(clippy::manual_string_new)]
+                Some(String::from(#attr_hint_str))
+            };
 
             result = Some(ExportMetadata {
                 field: FIELD,
