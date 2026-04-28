@@ -89,30 +89,32 @@ pub fn derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 
                     Result::<FieldExportOps, TokenStream>::Ok(ops)
                 })
-                .transpose()
-                .unwrap();
+                .transpose();
             let is_flatten = export_ops
                 .as_ref()
+                .ok()
+                .and_then(|ops| ops.as_ref())
                 .map(|ops| ops.is_flatten())
                 .unwrap_or(false);
 
             let field_metadata = match (is_public, export_ops, is_signal) {
-                (false, None, _) | (true, None, true) => {
+                (false, Ok(None), _) | (true, Ok(None), true) => {
                     (TokenStream::default(), TokenStream::default())
                 }
-                (false, Some(_), _) => {
+                (false, Ok(Some(_)), _) => {
                     let err = compile_error("Only public fields can be exported!", export_attr);
 
                     (TokenStream::default(), err)
                 }
-                (true, export_ops, false) => derive_field_metadata(field, export_ops)
+                (true, Ok(export_ops), false) => derive_field_metadata(field, export_ops)
                     .map(|tokens| (tokens, TokenStream::default()))
                     .unwrap_or_else(|err| (TokenStream::default(), err)),
-                (true, Some(_), true) => {
+                (true, Ok(Some(_)), true) => {
                     let err = compile_error("Signals can not be exported!", export_attr);
 
                     (TokenStream::default(), err)
                 }
+                (_, Err(err), _) => (TokenStream::default(), err),
             };
 
             let get_field_dispatch =
