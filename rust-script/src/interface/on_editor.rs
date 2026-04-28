@@ -9,10 +9,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use godot::{
-    classes::class_macros::sys::GodotNullableFfi,
-    meta::{FromGodot, GodotConvert, GodotType, ToGodot},
-};
+use godot::meta::{FromGodot, GodotConvert, GodotType, ToGodot};
 
 #[derive(Debug)]
 enum ValueState<T> {
@@ -35,8 +32,7 @@ impl<T> Default for OnEditor<T> {
 
 impl<T: GodotConvert> GodotConvert for OnEditor<T>
 where
-    for<'a> <T::Via as GodotType>::ToFfi<'a>: GodotNullableFfi,
-    <T::Via as GodotType>::Ffi: GodotNullableFfi,
+    Option<T::Via>: GodotType,
 {
     type Via = Option<T::Via>;
 
