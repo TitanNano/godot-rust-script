@@ -9,7 +9,7 @@ use godot::classes::{Node, Node3D};
 use godot::obj::{Gd, NewAlloc};
 use godot::register::info::PropertyHint;
 use godot_rust_script::{
-    CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, RsRef, ScriptExportGroup,
+    CastToScript, Context, GodotScript, GodotScriptEnum, OnEditor, Rs, RsDynify, ScriptExportGroup,
     ScriptExportSubgroup, ScriptSignal, godot_script_impl,
 };
 
@@ -43,7 +43,7 @@ struct TestScript {
     pub ready_base: ScriptSignal<Gd<Node>>,
 
     #[signal]
-    pub ready_self: ScriptSignal<RsRef<TestScript>>,
+    pub ready_self: ScriptSignal<Rs<TestScript>>,
 
     pub node_prop: Option<Gd<Node3D>>,
 
@@ -64,11 +64,11 @@ struct TestScript {
     pub custom_enum: ScriptEnum,
 
     #[export]
-    pub script_ref_opt: Option<RsRef<TestScript>>,
+    pub script_ref_opt: Option<Rs<TestScript>>,
 
     #[export_subgroup(name = "Refs")]
     #[export(custom(hint = PropertyHint::NODE_TYPE, hint_string = ""))]
-    pub script_ref: OnEditor<RsRef<TestScript>>,
+    pub script_ref: OnEditor<Rs<TestScript>>,
 
     /// Optional property group that can be toggled.
     #[cfg(since_api = "4.5")]
@@ -117,8 +117,28 @@ impl TestScript {
 
         ctx.reentrant_scope(self, |mut base: Gd<Node>| {
             base.set_owner(&Node::new_alloc());
+            let script = base.to_script::<Self>();
+            let mut trait_obj = script.into_trait::<dyn ScriptTrait>();
+
+            trait_obj.trait_function(10);
         });
 
         result
+    }
+}
+
+trait ScriptTrait {
+    fn trait_function(&mut self, value: u8);
+}
+
+impl<T: ITestScript> ScriptTrait for T {
+    fn trait_function(&mut self, value: u8) {
+        self.record(value);
+    }
+}
+
+impl RsDynify<dyn ScriptTrait> for TestScript {
+    fn coerce(source: Rs<Self>) -> Box<dyn ScriptTrait> {
+        Box::new(source) as Box<dyn ScriptTrait>
     }
 }

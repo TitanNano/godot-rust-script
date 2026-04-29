@@ -16,7 +16,7 @@ use godot::meta::{GodotConvert, ToGodot};
 use godot::obj::{Gd, GodotClass};
 
 use crate::static_script_registry::RustScriptPropDesc;
-use crate::{GodotScript, RsRef};
+use crate::{GodotScript, Rs};
 
 use super::GetScriptProperty;
 
@@ -165,7 +165,7 @@ impl<T: GodotClass> SignalArguments for Gd<T> {
     }
 }
 
-impl<T: GodotScript> SignalArguments for RsRef<T> {
+impl<T: GodotScript> SignalArguments for Rs<T> {
     const COUNT: u8 = 1;
 
     fn to_variants(&self) -> Vec<Variant> {
