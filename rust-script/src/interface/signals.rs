@@ -239,6 +239,7 @@ impl<T: SignalArguments> GodotConvert for ScriptSignal<T> {
 
 impl<T: SignalArguments> ToGodot for ScriptSignal<T> {
     type Pass = ByValue;
+    type Threads = <godot::builtin::Signal as ToGodot>::Threads;
 
     fn to_godot(&self) -> Self::Via {
         godot::builtin::Signal::from_object_signal(&self.host, self.name)

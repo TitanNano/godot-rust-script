@@ -179,6 +179,7 @@ where
 
 impl<T: GodotScript> ToGodot for Rs<T> {
     type Pass = ByValue;
+    type Threads = <Self::Via as ToGodot>::Threads;
 
     fn to_godot(&self) -> Self::Via {
         self.deref().clone()

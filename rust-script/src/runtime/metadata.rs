@@ -7,43 +7,57 @@
 use std::ops::Deref;
 
 use godot::builtin::StringName;
+use godot::obj::Unique;
 use godot::prelude::{Array, VarDictionary};
 use godot::register::info::{MethodInfo, PropertyInfo};
 use godot::sys::VariantType;
 
-use crate::apply::Apply;
-
 pub(super) trait ToDictionary {
-    fn to_dict(&self) -> VarDictionary;
+    fn to_dict(&self) -> Unique<VarDictionary>;
 }
 
 impl ToDictionary for PropertyInfo {
-    fn to_dict(&self) -> VarDictionary {
-        let mut dict = VarDictionary::new();
+    fn to_dict(&self) -> Unique<VarDictionary> {
+        let mut dict = Unique::<VarDictionary>::new();
 
-        dict.set("name", &self.property_name);
-        dict.set("class_name", &self.class_name);
-        dict.set("type", self.variant_type);
-        dict.set("hint", self.hint_info.hint);
-        dict.set("hint_string", &self.hint_info.hint_string);
-        dict.set("usage", self.usage);
+        dict.apply(|dict| {
+            dict.set("name", &self.property_name);
+            dict.set("class_name", &self.class_name);
+            dict.set("type", self.variant_type);
+            dict.set("hint", self.hint_info.hint);
+            dict.set("hint_string", &self.hint_info.hint_string);
+            dict.set("usage", self.usage);
+        });
 
         dict
     }
 }
 
 impl ToDictionary for MethodInfo {
-    fn to_dict(&self) -> VarDictionary {
-        VarDictionary::new().apply(|dict| {
-            dict.set("name", &self.method_name);
-            dict.set("flags", self.flags);
+    fn to_dict(&self) -> Unique<VarDictionary> {
+        let mut dict = Unique::<VarDictionary>::new();
+        let method_name = self.method_name.clone();
+        let flags = self.flags;
+        let return_type = self.return_type.to_dict();
+        let mut args = Unique::<Array<VarDictionary>>::new();
 
-            let args: Array<_> = self.arguments.iter().map(|arg| arg.to_dict()).collect();
+        self.arguments
+            .iter()
+            .map(|arg| arg.to_dict())
+            .for_each(|item| {
+                args.apply(move |args| {
+                    args.push(item);
+                });
+            });
 
-            dict.set("args", &args);
+        dict.apply(|dict| {
+            dict.set("name", &method_name);
+            dict.set("flags", flags);
+            dict.set("args", args);
+            dict.set("return", return_type);
+        });
 
-            dict.set("return", &self.return_type.to_dict());
-        })
+        dict
     }
 }
 
@@ -101,35 +115,46 @@ fn prop_doc_type(prop_type: VariantType, class_name: &StringName) -> StringName 
 }
 
 pub trait ToMethodDoc {
-    fn to_method_doc(&self) -> VarDictionary;
+    fn to_method_doc(&self) -> Unique<VarDictionary>;
 }
 
 impl ToMethodDoc for MethodInfo {
-    fn to_method_doc(&self) -> VarDictionary {
-        let args: Array<VarDictionary> = self
-            .arguments
+    fn to_method_doc(&self) -> Unique<VarDictionary> {
+        let mut args = Unique::<Array<VarDictionary>>::new();
+
+        self.arguments
             .iter()
             .map(|arg| arg.to_argument_doc())
-            .collect();
+            .for_each(|arg| {
+                args.apply(|args| {
+                    args.push(arg);
+                });
+            });
+        let method_name = self.method_name.clone();
+        let return_type =
+            &prop_doc_type(self.return_type.variant_type, &self.return_type.class_name);
 
-        VarDictionary::new().apply(|dict| {
-            dict.set("name", &self.method_name);
-            dict.set(
-                "return_type",
-                &prop_doc_type(self.return_type.variant_type, &self.return_type.class_name),
-            );
+        let mut dict = Unique::<VarDictionary>::new();
+
+        dict.apply(|dict| {
+            dict.set("name", &method_name);
+            dict.set("return_type", return_type);
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
-            dict.set("arguments", &args);
-        })
+            dict.set("arguments", args);
+        });
+
+        dict
     }
 }
 
 impl<T: ToMethodDoc> ToMethodDoc for Documented<T> {
-    fn to_method_doc(&self) -> VarDictionary {
-        self.inner
-            .to_method_doc()
-            .apply(|dict| dict.set("description", self.description))
+    fn to_method_doc(&self) -> Unique<VarDictionary> {
+        let mut dict = self.inner.to_method_doc();
+        let description = self.description;
+
+        dict.apply(|dict| dict.set("description", description));
+        dict
     }
 }
 
@@ -184,45 +209,61 @@ impl<T: Clone> Clone for Documented<T> {
 }
 
 pub trait ToArgumentDoc {
-    fn to_argument_doc(&self) -> VarDictionary;
+    fn to_argument_doc(&self) -> Unique<VarDictionary>;
 }
 
 impl ToArgumentDoc for PropertyInfo {
-    fn to_argument_doc(&self) -> VarDictionary {
-        VarDictionary::new().apply(|dict| {
+    fn to_argument_doc(&self) -> Unique<VarDictionary> {
+        let mut dict = Unique::<VarDictionary>::new();
+
+        dict.apply(|dict| {
             dict.set("name", &self.property_name);
             dict.set("type", &prop_doc_type(self.variant_type, &self.class_name));
-        })
+        });
+
+        dict
     }
 }
 
 impl<T: ToArgumentDoc> ToArgumentDoc for Documented<T> {
-    fn to_argument_doc(&self) -> VarDictionary {
-        self.inner.to_argument_doc().apply(|dict| {
-            dict.set("description", self.description);
-        })
+    fn to_argument_doc(&self) -> Unique<VarDictionary> {
+        let mut dict = self.inner.to_argument_doc();
+        let description = self.description;
+
+        dict.apply(|dict| {
+            dict.set("description", description);
+        });
+
+        dict
     }
 }
 
 pub trait ToPropertyDoc {
-    fn to_property_doc(&self) -> VarDictionary;
+    fn to_property_doc(&self) -> Unique<VarDictionary>;
 }
 
 impl ToPropertyDoc for PropertyInfo {
-    fn to_property_doc(&self) -> VarDictionary {
-        VarDictionary::new().apply(|dict| {
+    fn to_property_doc(&self) -> Unique<VarDictionary> {
+        let mut dict = Unique::<VarDictionary>::new();
+
+        dict.apply(|dict| {
             dict.set("name", &self.property_name);
             dict.set("type", &prop_doc_type(self.variant_type, &self.class_name));
             dict.set("is_deprecated", false);
             dict.set("is_experimental", false);
-        })
+        });
+
+        dict
     }
 }
 
 impl<T: ToPropertyDoc> ToPropertyDoc for Documented<T> {
-    fn to_property_doc(&self) -> VarDictionary {
-        self.inner
-            .to_property_doc()
-            .apply(|dict| dict.set("description", self.description))
+    fn to_property_doc(&self) -> Unique<VarDictionary> {
+        let mut dict = self.inner.to_property_doc();
+        let description = self.description;
+
+        dict.apply(|dict| dict.set("description", description));
+
+        dict
     }
 }
