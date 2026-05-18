@@ -31,6 +31,8 @@ pub use property_group::{
 #[expect(deprecated)]
 pub use signals::{ScriptSignal, Signal};
 
+// ----------------------------------------- Godot Rust Script -----------------------------------------
+
 pub trait GodotScript: Debug + GodotScriptImpl<ImplBase = Self::Base> {
     type Base: Inherits<Object>;
 
@@ -62,13 +64,22 @@ pub trait GodotScriptImpl {
     ) -> Result<Variant, godot::meta::error::CallErrorType>;
 }
 
+// ----------------------------------------- Rust Script Reference -----------------------------------------
+
+/// A Godot rust script reference.
+///
+/// This type represents a Godot rust script that is known to have a script of type `T` attached. The script reference allows calling
+/// public methods of the script without having to resort to using `Object::call`.
 #[derive(Debug)]
-pub struct RsRef<T: GodotScript> {
+pub struct Rs<T: GodotScript> {
     owner: Gd<T::Base>,
     script_ty: PhantomData<T>,
 }
 
-impl<T: GodotScript> RsRef<T> {
+#[deprecated(note = "Has been renamed to Rs<T>.")]
+pub type RsRef<T> = Rs<T>;
+
+impl<T: GodotScript> Rs<T> {
     pub(crate) fn new<B: Inherits<T::Base> + Inherits<Object>>(owner: Gd<B>) -> Self {
         Self {
             owner: owner.upcast(),
@@ -97,9 +108,36 @@ impl<T: GodotScript> RsRef<T> {
             GodotScriptCastError::ClassMismatch(T::CLASS_NAME, script.get_class().to_string())
         })
     }
+
+    /// Coerce a script reference into a trait object.
+    ///
+    /// The trait `RsDynify<dyn Trait>` must be implemented for a script type for it to be coerce-able. Implementing the trait requires a single line.
+    ///
+    /// ```rs
+    /// # trait ScriptTrait {}
+    /// #
+    /// # #[derive(GodotScript)]
+    /// # struct TestScript;
+    /// #
+    /// # #[godot_script_impl]
+    /// # impl TestScript {}
+    /// #
+    /// impl RsDynify<dyn ScriptTrait> for TestScript {
+    ///     fn coherce(source: Rs<Self>) -> Box<dyn ScriptTrait> {
+    ///         Box::new(source) as Box<dyn ScriptTrait>
+    ///     }
+    /// }
+    /// ```
+    /// An attribute macro will likely be provided in the future.
+    pub fn into_trait<Trait: ?Sized>(self) -> RsDyn<Trait>
+    where
+        T: RsDynify<Trait>,
+    {
+        RsDynify::wrap(self)
+    }
 }
 
-impl<T: GodotScript> Deref for RsRef<T> {
+impl<T: GodotScript> Deref for Rs<T> {
     type Target = Gd<T::Base>;
 
     fn deref(&self) -> &Self::Target {
@@ -107,13 +145,13 @@ impl<T: GodotScript> Deref for RsRef<T> {
     }
 }
 
-impl<T: GodotScript> DerefMut for RsRef<T> {
+impl<T: GodotScript> DerefMut for Rs<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.owner
     }
 }
 
-impl<T: GodotScript> Clone for RsRef<T> {
+impl<T: GodotScript> Clone for Rs<T> {
     fn clone(&self) -> Self {
         Self {
             owner: self.owner.clone(),
@@ -122,7 +160,7 @@ impl<T: GodotScript> Clone for RsRef<T> {
     }
 }
 
-impl<T: GodotScript> GodotConvert for RsRef<T> {
+impl<T: GodotScript> GodotConvert for Rs<T> {
     type Via = Gd<T::Base>;
 
     fn godot_shape() -> GodotShape {
@@ -130,7 +168,7 @@ impl<T: GodotScript> GodotConvert for RsRef<T> {
     }
 }
 
-impl<T: GodotScript> FromGodot for RsRef<T>
+impl<T: GodotScript> FromGodot for Rs<T>
 where
     T::Base: Inherits<T::Base>,
 {
@@ -139,7 +177,7 @@ where
     }
 }
 
-impl<T: GodotScript> ToGodot for RsRef<T> {
+impl<T: GodotScript> ToGodot for Rs<T> {
     type Pass = ByValue;
 
     fn to_godot(&self) -> Self::Via {
@@ -147,7 +185,7 @@ impl<T: GodotScript> ToGodot for RsRef<T> {
     }
 }
 
-impl<T: GodotScript> ::godot::prelude::Var for RsRef<T>
+impl<T: GodotScript> ::godot::prelude::Var for Rs<T>
 where
     Self: GodotConvert,
 {
@@ -170,6 +208,50 @@ where
     }
 }
 
+// ----------------------------------------- Rust Script Trait Object Ref -----------------------------------------
+
+/// Godot rust script reference as a trait object.
+///
+/// It is possible to implement traits for Godot rust scripts.
+#[derive(Debug)]
+pub struct RsDyn<T: ?Sized> {
+    owner: Box<T>,
+}
+
+/// Support trait for dynamic trait coercion.
+///
+/// Any script type that implements a trait must also implement this trait for the script trait to be accessible.
+///
+/// See [`Rs::into_trait`].
+#[diagnostic::on_unimplemented(
+    message = "Unable to create trait object {T} from Rs<{Self}>",
+    label = "Conversion not implemented",
+    note = "If {T} is implemented for Rs<{Self}>, you also have to implement RsDynify<{T}> for {Self}"
+)]
+pub trait RsDynify<T: ?Sized>: Sized + GodotScript {
+    fn coerce(source: Rs<Self>) -> Box<T>;
+
+    fn wrap(value: Rs<Self>) -> RsDyn<T> {
+        RsDyn {
+            owner: Self::coerce(value),
+        }
+    }
+}
+
+impl<T: ?Sized> Deref for RsDyn<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.owner
+    }
+}
+
+impl<T: ?Sized> DerefMut for RsDyn<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.owner
+    }
+}
+
 #[derive(thiserror::Error, Debug)]
 pub enum GodotScriptCastError {
     #[error("Object has no script attached!")]
@@ -184,31 +266,54 @@ pub enum GodotScriptCastError {
     ClassMismatch(&'static str, String),
 }
 
-pub trait CastToScript<T: GodotScript> {
-    fn try_to_script(&self) -> Result<RsRef<T>, GodotScriptCastError>;
-    fn try_into_script(self) -> Result<RsRef<T>, GodotScriptCastError>;
-    fn to_script(&self) -> RsRef<T>;
-    fn into_script(self) -> RsRef<T>;
+pub trait CastToScript {
+    type Base: Inherits<Object>;
+
+    fn try_to_script<T: GodotScript>(&self) -> Result<Rs<T>, GodotScriptCastError>
+    where
+        Self::Base: Inherits<T::Base>;
+    fn try_into_script<T: GodotScript>(self) -> Result<Rs<T>, GodotScriptCastError>
+    where
+        Self::Base: Inherits<T::Base>;
+
+    fn to_script<T: GodotScript>(&self) -> Rs<T>
+    where
+        Self::Base: Inherits<T::Base>;
+
+    fn into_script<T: GodotScript>(self) -> Rs<T>
+    where
+        Self::Base: Inherits<T::Base>;
 }
 
-impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> for Gd<B> {
-    fn try_to_script(&self) -> Result<RsRef<T>, GodotScriptCastError> {
-        if let Some(err) = RsRef::<T>::validate_script(self) {
+impl<B: Inherits<Object>> CastToScript for Gd<B> {
+    type Base = B;
+
+    fn try_to_script<T: GodotScript>(&self) -> Result<Rs<T>, GodotScriptCastError>
+    where
+        Self::Base: Inherits<T::Base>,
+    {
+        if let Some(err) = Rs::<T>::validate_script(self) {
             return Err(err);
         }
 
-        Ok(RsRef::new(self.clone()))
+        Ok(Rs::new(self.clone()))
     }
 
-    fn try_into_script(self) -> Result<RsRef<T>, GodotScriptCastError> {
-        if let Some(err) = RsRef::<T>::validate_script(&self) {
+    fn try_into_script<T: GodotScript>(self) -> Result<Rs<T>, GodotScriptCastError>
+    where
+        Self::Base: Inherits<T::Base>,
+    {
+        if let Some(err) = Rs::<T>::validate_script(&self) {
             return Err(err);
         }
 
-        Ok(RsRef::new(self))
+        Ok(Rs::new(self))
     }
 
-    fn to_script(&self) -> RsRef<T> {
+    fn to_script<T: GodotScript>(&self) -> Rs<T>
+    where
+        Self::Base: Inherits<T::Base>,
+    {
         self.try_to_script().unwrap_or_else(|err| {
             panic!(
                 "`{}` was assumed to have rust script `{}`, but this was not the case at runtime!\nError: {}",
@@ -219,7 +324,10 @@ impl<T: GodotScript, B: Inherits<T::Base> + Inherits<Object>> CastToScript<T> fo
         })
     }
 
-    fn into_script(self) -> RsRef<T> {
+    fn into_script<T: GodotScript>(self) -> Rs<T>
+    where
+        Self::Base: Inherits<T::Base>,
+    {
         self.try_into_script().unwrap_or_else(|err| {
             panic!(
                 "`{}` was assumed to have rust script `{}`, but this was not the case at runtime!\nError: {}",

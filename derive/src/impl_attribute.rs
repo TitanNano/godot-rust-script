@@ -6,15 +6,14 @@
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
+use syn::spanned::Spanned;
 use syn::{
-    FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, PatIdent, PatType, ReturnType, Token, Type,
-    Visibility, parse_macro_input, parse2, spanned::Spanned,
+    FnArg, Ident, ImplItem, ImplItemFn, ItemImpl, PatIdent, PatType, ReturnType, Signature, Type,
+    Visibility, parse_macro_input,
 };
 
-use crate::{
-    extract_ident_from_type, is_context_type, property_usage, rust_to_variant_type,
-    type_paths::{godot_types, property_hints, string_name_ty, variant_ty},
-};
+use crate::type_paths::{godot_types, property_hints, string_name_ty, variant_ty};
+use crate::{extract_ident_from_type, is_context_type, property_usage, rust_to_variant_type};
 
 pub fn godot_script_impl(
     _args: proc_macro::TokenStream,
@@ -203,12 +202,7 @@ pub fn godot_script_impl(
 
 fn sanitize_trait_fn_arg(arg: FnArg) -> FnArg {
     match arg {
-        FnArg::Receiver(mut rec) => {
-            rec.mutability = Some(Token![mut](rec.span()));
-            rec.ty = parse2(quote!(&mut Self)).unwrap();
-
-            FnArg::Receiver(rec)
-        }
+        FnArg::Receiver(_) => arg,
         FnArg::Typed(ty) => FnArg::Typed(PatType {
             attrs: ty.attrs,
             pat: match *ty.pat {
@@ -243,6 +237,11 @@ fn sanitize_trait_fn_arg(arg: FnArg) -> FnArg {
     }
 }
 
+struct InterfaceFn {
+    sig: Signature,
+    is_mut: bool,
+}
+
 fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
     let impl_target = impl_body.self_ty.as_ref();
     let script_name = match extract_ident_from_type(impl_target) {
@@ -267,22 +266,34 @@ fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
                 .into_iter()
                 .filter(|arg| {
                     !matches!(arg, FnArg::Typed(PatType { attrs: _, pat: _, colon_token: _, ty }) if matches!(ty.as_ref(), Type::Path(path) if path.path.segments.last().unwrap().ident == "Context"))
-                })
-                .map(sanitize_trait_fn_arg)
+                }).map(sanitize_trait_fn_arg)
                 .collect();
-            sig
+            let is_mut = sig.inputs.iter().any(|arg| {
+                matches!(arg, FnArg::Receiver(rec) if rec.mutability.is_some())
+            });
+
+            InterfaceFn {
+                sig,
+                is_mut
+            }
         })
         .collect();
 
     let function_defs: TokenStream = functions
         .iter()
-        .map(|func| quote_spanned! { func.span() =>  #func; })
+        .map(|func| {
+            let sig = &func.sig;
+
+            quote_spanned! { sig.span() =>  #sig; }
+        })
         .collect();
     let function_impls: TokenStream = functions
         .iter()
         .map(|func| {
-            let func_name = func.ident.to_string();
-            let args: TokenStream = func
+            let sig = &func.sig;
+
+            let func_name = sig.ident.to_string();
+            let args: TokenStream = sig
                 .inputs
                 .iter()
                 .filter_map(|arg| match arg {
@@ -298,9 +309,15 @@ fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
                 })
                 .collect();
 
-            quote_spanned! { func.span() =>
-                #func {
-                    (*self).call(#func_name, &[#args]).to()
+            let receiver = if func.is_mut {
+                quote_spanned! { sig.span() => (*self) }
+            } else {
+                quote_spanned! { sig.span() => (*self).clone() }
+            };
+
+            quote_spanned! { sig.span() =>
+                #sig {
+                    #receiver.call(#func_name, &[#args]).to()
                 }
             }
         })
@@ -315,7 +332,7 @@ fn generate_public_interface(impl_body: &ItemImpl) -> TokenStream {
 
         #[automatically_derived]
         #[allow(dead_code)]
-        impl #trait_name for ::godot_rust_script::RsRef<#impl_target> {
+        impl #trait_name for ::godot_rust_script::Rs<#impl_target> {
             #function_impls
         }
     }

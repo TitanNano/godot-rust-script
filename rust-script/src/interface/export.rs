@@ -21,7 +21,7 @@ use godot::register::info::PropertyHint;
 use godot::register::property::BuiltinExport;
 use godot::sys::GodotFfi;
 
-use super::{GodotScript, OnEditor, RsRef};
+use super::{GodotScript, OnEditor, Rs};
 
 pub trait GodotScriptExport {
     fn hint_string(custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String;
@@ -53,7 +53,7 @@ impl<T: GodotClass> GodotScriptExport for Gd<T> {
     }
 }
 
-impl<T: GodotScript> GodotScriptExport for RsRef<T> {
+impl<T: GodotScript> GodotScriptExport for Rs<T> {
     fn hint_string(_custom_hint: Option<PropertyHint>, custom_string: Option<String>) -> String {
         if let Some(custom) = custom_string {
             return custom;
@@ -123,7 +123,7 @@ where
     }
 }
 
-impl<T: GodotScript> BuiltinExport for RsRef<T> {}
+impl<T: GodotScript> BuiltinExport for Rs<T> {}
 
 macro_rules! default_export {
     ($ty:ty) => {
