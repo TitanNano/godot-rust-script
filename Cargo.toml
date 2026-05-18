@@ -11,9 +11,9 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
-godot = { version = "0.5.0", features = ["experimental-threads"] }
-godot-cell = "0.5.0"
-godot-bindings = "0.5.0"
+godot = { version = "0.5.2", features = ["experimental-threads"] }
+godot-cell = "0.5.2"
+godot-bindings = "0.5.2"
 itertools = "0.10"
 rand = "0.9"
 darling = { version = "0.20" }
@@ -25,3 +25,7 @@ thiserror = "1"
 
 godot-rust-script-derive = { path = "derive" }
 tests-scripts-lib = { path = "tests-scripts-lib" }
+
+[patch.crates-io]
+godot = { git = 'https://github.com/godot-rust/gdext.git', rev = "c8efece16cbae4017b5e6b4217f39136cda0f51d" }
+

@@ -47,6 +47,7 @@ impl GodotConvert for EditorToasterSeverity {
 
 impl ToGodot for EditorToasterSeverity {
     type Pass = ByValue;
+    type Threads = godot::meta::ThreadSafeArg;
 
     fn to_godot(&self) -> Self::Via {
         (*self).into()

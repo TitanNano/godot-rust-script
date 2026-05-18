@@ -95,6 +95,7 @@ pub fn script_enum_derive(input: proc_macro::TokenStream) -> proc_macro::TokenSt
 
         impl #godot_types::meta::ToGodot for #enum_ident {
             type Pass = ::godot::meta::conv::ByValue;
+            type Threads = <Self::Via as #godot_types::meta::ToGodot>::Threads;
 
             fn to_godot(&self) -> Self::Via {
                 #enum_from_self::from(self)
