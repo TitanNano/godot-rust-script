@@ -25,7 +25,7 @@ pub mod private_export {
         assemble_metadata, create_default_data_struct,
     };
     pub use const_str::{concat, replace, strip_prefix, unwrap};
-    pub use godot::sys::{plugin_add, plugin_registry};
+    pub use godot::sys::{shard_add, shard_registry};
 }
 
 pub use godot;
