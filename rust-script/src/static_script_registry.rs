@@ -20,12 +20,12 @@ use godot::sys::VariantType;
 use crate::interface::GodotScript;
 use crate::runtime::GodotScriptObject;
 
-godot::sys::plugin_registry!(pub SCRIPT_REGISTRY: RegistryItem);
+godot::sys::shard_registry!(pub SCRIPT_REGISTRY: RegistryItem);
 
 #[macro_export]
 macro_rules! register_script_class {
     ($class_name:ty, $base_name:ty, $desc:expr, $is_tool: literal, $builder:ident => $props:tt) => {
-        $crate::private_export::plugin_add! {
+        $crate::private_export::shard_add! {
             $crate::private_export::SCRIPT_REGISTRY;
             $crate::private_export::RegistryItem::Entry(|| {
                 let mut $builder = $crate::private_export::RustScriptEntry::builder(
@@ -47,7 +47,7 @@ macro_rules! register_script_class {
 #[macro_export]
 macro_rules! register_script_methods {
     ($class_name:ty, $method_capacity:literal, $builder:ident => $methods:tt) => {
-        $crate::private_export::plugin_add! {
+        $crate::private_export::shard_add! {
             $crate::private_export::SCRIPT_REGISTRY ;
             $crate::private_export::RegistryItem::Methods(|| {
                 let mut $builder = $crate::private_export::RustScriptEntryMethods::builder(stringify!($class_name), $method_capacity);
