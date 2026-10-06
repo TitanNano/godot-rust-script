@@ -409,7 +409,7 @@ macro_rules! define_script_root {
         }
 
         pub const __GODOT_RUST_SCRIPT_SRC_ROOT: &str = $crate::private_export::concat!(
-            env!("CARGO_MANIFEST_DIR"),
+            $crate::private_export::replace!(env!("CARGO_MANIFEST_DIR"), "\\", "/"),
             "/src",
             $crate::private_export::replace!(
                 $crate::private_export::unwrap!($crate::private_export::strip_prefix!(
