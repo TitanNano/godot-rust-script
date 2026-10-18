@@ -14,16 +14,16 @@ permissions:
 
 jobs:
   build:
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-26.04"
     env:
       RUSTFLAGS: "-D warnings"
     strategy:
       matrix:
-        api_version: ["4-2", "4-3", "4-4", "4-5"]
+        api_version: ["4-4", "4-5", "4-6", "4-7"]
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
     - name: Setup Cache
       uses: Swatinem/rust-cache@v2
       with:
@@ -39,21 +39,21 @@ jobs:
         set -o pipefail
         cargo build --release --workspace --features "godot/api-${{ matrix.api_version}}" --all-features --message-format json | clippy-sarif | tee rust-build-results.sarif | sarif-fmt
     - name: Upload Results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v4
       if: ${{ always() }}
       with:
         sarif_file: rust-build-results.sarif
         wait-for-processing: true 
 
   clippy:
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-26.04"
     strategy:
       matrix:
-        api_version: ["4-2", "4-3", "4-4", "4-5"]
+        api_version: ["4-4", "4-5", "4-6", "4-7"]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
         with:
@@ -65,22 +65,17 @@ jobs:
           set -o pipefail
           cargo clippy --message-format json --workspace --all-features --features "godot/api-${{ matrix.api_version}}" -- -D warnings | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
       - name: Upload Results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: ${{ always() }}
         with:
           sarif_file: rust-clippy-results.sarif
           wait-for-processing: true
 
   tests:
-    runs-on: "ubuntu-22.04"
-    strategy:
-      matrix:
-        # pre-relase godot version is disabled due to breaking changes with godot-rust
-        api_version: ["4-2", "4-3", "4-4", "4-5"] # "custom"
-
+    runs-on: "ubuntu-26.04"
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Setup Cache
         uses: Swatinem/rust-cache@v2
@@ -92,28 +87,19 @@ jobs:
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           brew install nushell
 
-      - name: Download Godot Prerelease
-        id: prerelease_setup
-        if: ${{ matrix.api_version == 'custom' }}
-        run: |
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          brew install llvm
-          GODOT4_BIN="$(./download_godot_dev.nu)"
-          echo "godot4_bin=$GODOT4_BIN" >> "$GITHUB_OUTPUT"
-
       - name: Tests
         env:
           LLVM_PATH: "/home/linuxbrew/.linuxbrew/opt/llvm/bin"
           GODOT4_BIN: ${{ steps.prerelease_setup.outputs.godot4_bin }}
         run: |
-          cargo test --features "godot/api-${{ matrix.api_version}}" 
+          cargo test --features "godot/api-4-7" 
 
   license:
-    runs-on: "ubuntu-22.04"
+    runs-on: "ubuntu-26.04"
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v7
 
       - name: Install ENV
         run: |
