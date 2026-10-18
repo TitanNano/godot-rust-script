@@ -4,8 +4,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-use std::ffi::{OsStr, c_void};
-
 use godot::classes::class_macros::private::virtuals::Os::VarDictionary;
 use godot::classes::native::ScriptLanguageExtensionProfilingInfo;
 #[cfg(since_api = "4.3")]
@@ -19,6 +17,8 @@ use godot::prelude::{
     Variant, godot_api,
 };
 use itertools::Itertools;
+use std::ffi::{OsStr, c_void};
+use std::path::PathBuf;
 
 use crate::apply::Apply;
 use crate::static_script_registry::RustScriptMetaData;
@@ -143,22 +143,32 @@ impl IScriptLanguageExtension for RustScriptLanguage {
         }
     }
 
-    /// validate that the path of a new rust script is valid. Constraints for script locations can be enforced here.
+    /// validate that the path of a new Rust script is valid. Constraints for script locations can be enforced here.
     fn validate_path(&self, path: GString) -> GString {
-        let Some(rs_root) = self
+        let Some(scripts_src_dir) = self
             .scripts_src_dir
-            .map(|path| ProjectSettings::singleton().localize_path(path))
+            .map(|path| PathBuf::from(path.to_string()))
         else {
             return GString::from(
                 "Unable to validate script location! RustScript source location is known in the current execution context.",
             );
         };
+        let scripts_src_dir = match scripts_src_dir.canonicalize() {
+            Ok(scripts_src_dir) => scripts_src_dir,
+            Err(err) => return GString::from(&format!("Unable to validate script location! {}", err.to_string())),
+        };
 
-        if !path.to_string().starts_with(&rs_root.to_string()) {
+        let path_obj = PathBuf::from(ProjectSettings::singleton().globalize_path(&path).to_string());
+        let path_obj =  match path_obj.canonicalize() {
+            Ok(path_obj) => path_obj,
+            Err(err) => return GString::from(&format!("Unable to validate script location! {}", err.to_string())),
+        };
+
+        if !path_obj.starts_with(scripts_src_dir) {
             return GString::from("rust file is not part of the scripts crate!");
         }
 
-        if !FileAccess::file_exists(&path) {
+        if !path_obj.is_file() {
             return GString::from("RustScripts can not be created via the Godot editor!");
         }
 
